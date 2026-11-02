@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask 遊戲大廳 Arcade</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 25px; color: var(--accent-color); font-size: 2.2rem; }
+
+        .container {
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            width: 340px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 25px rgba(56, 189, 248, 0.2);
+        }
+
+        .cover-img {
+            width: 100%;
+            height: 180px;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            position: relative;
+        }
+        .cover-1 { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }
+        .cover-2 { background: linear-gradient(135deg, #064e3b, #10b981); }
+        .cover-3 { background: linear-gradient(135deg, #581c87, #a855f7); }
+
+        .card-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: space-between;
+        }
+
+        .card-title { font-size: 1.3rem; margin: 0 0 5px 0; font-weight: bold; }
+        .card-meta { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 12px; }
+        .card-desc { font-size: 0.9rem; color: #cbd5e1; margin-bottom: 15px; line-height: 1.4; }
+
+        .play-btn {
+            background-color: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.2s;
+        }
+        .play-btn:hover { background-color: var(--accent-hover); }
+
+        .game-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #0b0f19;
+            z-index: 999;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .game-header {
+            width: 100%;
+            max-width: 1050px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .back-btn {
+            background-color: #334155;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .back-btn:hover { background-color: #475569; }
+
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; align-items: center;}
+        select, button.ctrl-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background-color: #1e293b;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .td-layout {
+            display: flex;
+            gap: 15px;
+            max-width: 1050px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        #td-canvas {
+            background: #090d16;
+            border: 2px solid #38bdf8;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            cursor: crosshair;
+            max-width: 100%;
+        }
+
+        .td-shop-panel {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 12px;
+            width: 320px;
+            height: 480px;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        .shop-title {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 6px;
+        }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .tower-card {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tower-card:hover {
+            border-color: var(--accent-color);
+            background: #1e293b;
+        }
+        .tower-card.selected {
+            border-color: #34d399;
+            background: #064e3b;
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+        }
+        .tower-icon {
+            font-size: 1.5rem;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tower-info { display: flex; flex-direction: column; }
+        .tower-name { font-size: 0.8rem; font-weight: bold; color: #f8fafc; }
+        .tower-cost { font-size: 0.75rem; color: #f59e0b; }
+
+        #tower-upgrade-menu {
+            display: none;
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 170px;
+        }
+        #tower-upgrade-menu button {
+            background: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 5px 10px;
+            margin: 3px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        #tower-upgrade-menu button:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+        #tower-upgrade-menu button.fusion-btn { background: #a855f7; color: white; }
+        #tower-upgrade-menu button.sell-btn { background: #ef4444; color: white; }
+
+        .board-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+        .board-container { display: grid; gap: 2px; background: #334155; padding: 6px; border-radius: 8px; position: relative; }
+
+        .cchess-board-wrapper {
+            position: relative; width: 400px; height: 440px; background-color: #e2d2ac;
+            border: 4px solid #5c3a21; border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); user-select: none;
+            box-sizing: content-box;
+        }
+        .cchess-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .cchess-piece {
+            position: absolute; width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.1rem;
+            cursor: pointer; transform: translate(-50%, -50%); box-shadow: 2px 3px 6px rgba(0,0,0,0.4); z-index: 10;
+        }
+        .cchess-piece.red { background: linear-gradient(145deg, #fff5f5, #fed7d7); color: #cc0000; border: 2px solid #cc0000; }
+        .cchess-piece.black { background: linear-gradient(145deg, #ffffff, #e2e8f0); color: #1a202c; border: 2px solid #1a202c; }
+        .cchess-piece.selected { box-shadow: 0 0 0 4px #38bdf8; transform: translate(-50%, -50%) scale(1.15); z-index: 20; }
+        .cchess-hint-point {
+            position: absolute; width: 14px; height: 14px; background-color: rgba(52, 211, 153, 0.85);
+            border: 2px solid #065f46; border-radius: 50%; transform: translate(-50%, -50%); cursor: pointer; z-index: 15;
+        }
+
+        .history-panel { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; width: 220px; height: 416px; display: flex; flex-direction: column; box-sizing: border-box; }
+        .history-title { font-size: 0.95rem; font-weight: bold; color: var(--accent-color); margin: 0 0 8px 0; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+        .history-list { overflow-y: auto; flex-grow: 1; font-size: 0.82rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 5px; }
+
+        .board-cell { box-sizing: border-box; background: #1e293b; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; color: white; user-select: none; position: relative; }
+        .board-cell:hover { background: #475569; }
+        .board-cell.selected { background: #0284c7 !important; }
+        .board-cell .king { position: absolute; font-size: 13px; top: -1px; right: 0; pointer-events: none; }
+        /* 黑白棋可落子提示 */
+        .board-cell.reversi-valid { background: #064e3b !important; box-shadow: inset 0 0 0 1px #34d399; }
+        .board-cell.reversi-valid::after { content: ''; width: 10px; height: 10px; background-color: #34d399; border-radius: 50%; display: block; opacity: 0.8; }
+        /* 跳棋可移動提示 */
+        .board-cell.ck-hint { background: #064e3b !important; box-shadow: inset 0 0 0 2px #34d399; }
+
+        .card-grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 12px; margin-top: 15px; }
+        .memory-card { width: 80px; height: 100px; background: #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; user-select: none; }
+        .memory-card.flipped { background: #1e293b; border: 2px solid var(--accent-color); }
+        .memory-card.matched { background: #064e3b; border: 2px solid #34d399; cursor: default; }
+        #card-msg { margin-top: 15px; font-size: 1.2rem; font-weight: bold; color: #34d399; min-height: 1.5em; }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 迷你網頁遊戲大廳</h1>
+
+    <div class="container">
+        <div class="card">
+            <div class="cover-img cover-1">♟️⭕</div>
+            <div class="card-body">
+                <div>
+                    <div class="card-title">欄位 1：萬能棋類遊戲館</div>
+                    <div class="card-meta">作者: Developer | 棋牌對戰</div>
+                    <div class="card-desc">含圈圈叉叉、五子棋、黑白棋、西洋跳棋與中國象棋。</div>
+                </div>
+                <button class="play-btn" onclick="openGame('game1')">▶ 開始遊戲</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="cover-img cover-2">🏰🏹</div>
+            <div class="card-body">
+                <div>
+                    <div class="card-title">欄位 2：經典塔防戰鬥</div>
+                    <div class="card-meta">作者: Developer | 策略防守</div>
+                    <div class="card-desc">位置固定選單、無彈窗融合、100% 絕對零衝突固定配方！</div>
+                </div>
+                <button class="play-btn" onclick="openGame('game2')">▶ 開始遊戲</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="cover-img cover-3">🃏✨</div>
+            <div class="card-body">
+                <div>
+                    <div class="card-title">欄位 3：記憶卡牌翻牌</div>
+                    <div class="card-meta">作者: Developer | 益智記憶</div>
+                    <div class="card-desc">測試你的大腦記憶力！翻開卡牌尋找配對，嘗試以最少步數通關。</div>
+                </div>
+                <button class="play-btn" onclick="openGame('game3')">▶ 開始遊戲</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 遊戲 1 畫面：棋類遊戲館 ================= -->
+    <div id="game1" class="game-overlay">
+        <div class="game-header">
+            <h2>♟️ 萬能棋類遊戲館</h2>
+            <button class="back-btn" onclick="closeGame('game1')">← 返回大廳</button>
+        </div>
+        <div class="controls">
+            <label>棋類模式：</label>
+            <select id="board-game-mode" onchange="onGameModeChange()">
+                <option value="ttt3" selected>1. 經典圈圈叉叉</option>
+                <option value="gomoku">2. 五子棋</option>
+                <option value="reversi">3. 經典黑白棋</option>
+                <option value="checkers">4. 西洋跳棋</option>
+                <option value="cchess">5. 中國象棋</option>
+            </select>
+
+            <label>對戰對手：</label>
+            <select id="board-opponent" onchange="initBoardGame()">
+                <option value="ai">🤖 人機對戰</option>
+                <option value="pvp">👥 雙人對戰</option>
+            </select>
+
+            <label id="diff-label">AI難度：</label>
+            <select id="board-diff" onchange="initBoardGame()">
+                <option value="1">簡單</option>
+                <option value="2">中等</option>
+                <option value="3" selected>困難</option>
+            </select>
+
+            <button class="ctrl-btn" onclick="initBoardGame()">重新開始</button>
+        </div>
+        <div id="board-status" style="margin-bottom:10px; font-weight:bold; color:var(--accent-color);">當前回合：X</div>
+
+        <div class="board-layout">
+            <div id="board-container"></div>
+            <div class="history-panel">
+                <div class="history-title">📜 移動紀錄</div>
+                <div id="history-list" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 遊戲 2 畫面：科技塔防 ================= -->
+    <div id="game2" class="game-overlay">
+        <div class="game-header">
+            <h2>🏰 賽博科技塔防</h2>
+            <button class="back-btn" onclick="closeGame('game2')">← 返回大廳</button>
+        </div>
+        <div class="controls">
+            <button class="ctrl-btn" id="td-pause-btn" onclick="toggleTDPause()">暫停</button>
+            <label>倍速：</label>
+            <select id="td-speed" onchange="changeTDSpeed(this.value)">
+                <option value="1">1x</option>
+                <option value="2">2x</option>
+                <option value="3">3x</option>
+            </select>
+            <span style="margin-left: 10px;">關卡: <b id="td-wave" style="color:#38bdf8;">1</b></span>
+            <span style="margin-left: 10px;">金錢: <b id="td-money" style="color:#f59e0b;">500</b></span>
+            <span style="margin-left: 10px;">生命: <b id="td-hp" style="color:#ef4444;">10</b></span>
+            <button class="ctrl-btn" onclick="initTD()">重來</button>
+        </div>
+
+        <div class="td-layout" style="position: relative;">
+            <canvas id="td-canvas" width="680" height="480"></canvas>
+
+            <div id="tower-upgrade-menu">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <div id="menu-tower-title" style="font-weight:bold; color:var(--accent-color); font-size:0.85rem;">防禦塔設定</div>
+                    <button onclick="closeUpgradeMenu()" style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:1rem; padding:0; width:auto; margin:0;">✕</button>
+                </div>
+                <div id="menu-tower-stats" style="font-size:0.75rem; color:#cbd5e1; margin-bottom:8px;">等級: 1 | 範圍: 0</div>
+                <button id="menu-upgrade-btn" onclick="upgradeSelectedTower()">升級</button>
+                <button class="fusion-btn" id="menu-fusion-btn" onclick="startManualFusion()">選擇融合素材 $150</button>
+                <button class="sell-btn" id="menu-sell-btn" onclick="sellSelectedTower()">賣出</button>
+            </div>
+
+            <div class="td-shop-panel">
+                <div class="shop-title">🛠️ 武器商店</div>
+                <div class="shop-grid" id="tower-shop"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 遊戲 3 畫面：卡牌翻牌 ================= -->
+    <div id="game3" class="game-overlay">
+        <div class="game-header">
+            <h2>🃏 記憶卡牌對對碰</h2>
+            <button class="back-btn" onclick="closeGame('game3')">← 返回大廳</button>
+        </div>
+        <div class="controls">
+            <span>步數: <b id="card-moves">0</b> | 已配對: <b id="card-pairs">0</b> / 8</span>
+            <button class="ctrl-btn" onclick="initMemoryGame()">重新洗牌</button>
+        </div>
+        <div id="memory-board" class="card-grid"></div>
+        <div id="card-msg"></div>
+    </div>
+
+    <script>
+        /* ================= 共用 ================= */
+        let boardGameToken = 0;   // 每次重開/離開棋局就 +1，讓舊的 AI 計時器自動失效
+        let memoryToken = 0;
+
+        function openGame(id) {
+            document.getElementById(id).style.display = 'flex';
+            if (id === 'game1') { updateDifficultyOptions(); initBoardGame(); }
+            if (id === 'game2') initTD();
+            if (id === 'game3') initMemoryGame();
+        }
+        function closeGame(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'game1') boardGameToken++;
+            if (id === 'game2') stopTD();
+            if (id === 'game3') memoryToken++;
+            document.getElementById('tower-upgrade-menu').style.display = 'none';
+        }
+
+        /* ================= 遊戲 1 邏輯（萬能棋館） ================= */
+        let gameState = [], currentPlayer = 'X', gameOver = false, selectedIndex = -1, hintMoves = [], moveHistories = {};
+        let ckChain = -1, ckQuiet = 0;   // 跳棋：連跳鎖定的棋子位置、無吃子/無移動小兵的回合數
+        const AI_SIDE = { ttt3: 'O', gomoku: '白棋', reversi: '白棋', checkers: '藍棋', cchess: '黑' };
+
+        function isAITurn(mode, opp) { return opp === 'ai' && currentPlayer === AI_SIDE[mode]; }
+        function scheduleAI(fn, delay) {
+            const token = boardGameToken;
+            setTimeout(() => { if (token === boardGameToken && !gameOver) fn(); }, delay);
+        }
+        function setStatus(t) { document.getElementById('board-status').innerText = t; }
+
+        function logMove(mode, text) {
+            if (!moveHistories[mode]) moveHistories[mode] = [];
+            moveHistories[mode].push(text);
+            const list = document.getElementById('history-list');
+            if (list) {
+                list.innerHTML = moveHistories[mode].map(m => `<div>• ${m}</div>`).join('');
+                list.scrollTop = list.scrollHeight;
+            }
+        }
+
+        function onGameModeChange() {
+            updateDifficultyOptions();
+            initBoardGame();
+        }
+
+        function updateDifficultyOptions() {
+            const mode = document.getElementById('board-game-mode').value;
+            const diffSelect = document.getElementById('board-diff');
+            if (mode === 'ttt3') {
+                diffSelect.innerHTML = `
+                    <option value="1">簡單</option>
+                    <option value="2">中等</option>
+                    <option value="3" selected>困難</option>`;
+            } else if (mode === 'gomoku') {
+                diffSelect.innerHTML = `
+                    <option value="1">簡單</option>
+                    <option value="2" selected>中等</option>
+                    <option value="3">困難</option>`;
+            } else if (mode === 'reversi') {
+                diffSelect.innerHTML = `
+                    <option value="1">簡單</option>
+                    <option value="2" selected>中等</option>
+                    <option value="3">困難</option>`;
+            } else if (mode === 'checkers') {
+                diffSelect.innerHTML = `
+                    <option value="1">簡單</option>
+                    <option value="2" selected>中等</option>
+                    <option value="3">困難</option>`;
+            } else {
+                diffSelect.innerHTML = `
+                    <option value="1">簡單</option>
+                    <option value="2" selected>中等</option>
+                    <option value="3">困難</option>`;
+            }
+        }
+
+        function initBoardGame() {
+            boardGameToken++;
+            const mode = document.getElementById('board-game-mode').value;
+            const opp = document.getElementById('board-opponent').value;
+            document.getElementById('diff-label').style.display = opp === 'pvp' ? 'none' : 'inline';
+            document.getElementById('board-diff').style.display = opp === 'pvp' ? 'none' : 'inline';
+
+            selectedIndex = -1; hintMoves = []; gameOver = false; ckChain = -1; ckQuiet = 0;
+            moveHistories[mode] = [];
+            const list = document.getElementById('history-list');
+            if (list) list.innerHTML = '';
+
+            const container = document.getElementById('board-container');
+            container.className = ''; container.innerHTML = ''; container.style.gridTemplateColumns = '';
+
+            if (mode === 'cchess') initChineseChess(container, opp);
+            else initStandardGridGame(mode, opp, container);
+        }
+
+        /* ---------- 中國象棋 ---------- */
+        const P_MARGIN_X = 25, P_MARGIN_Y = 25, P_STEP_X = 43.75, P_STEP_Y = 43.33;
+        function getCChessPos(r, c) { return { x: P_MARGIN_X + c * P_STEP_X, y: P_MARGIN_Y + r * P_STEP_Y }; }
+
+        const CC_VAL = { '車': 900, '馬': 400, '砲': 450, '包': 450, '相': 200, '象': 200, '仕': 200, '士': 200, '兵': 100, '卒': 100, '帥': 0, '將': 0 };
+        const CC_ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        const CC_DIAG = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+        const CC_HORSE = [[-2, -1, -1, 0], [-2, 1, -1, 0], [2, -1, 1, 0], [2, 1, 1, 0], [-1, -2, 0, -1], [1, -2, 0, -1], [-1, 2, 0, 1], [1, 2, 0, 1]];
+        const CC_ELEPHANT = [[-2, -2, -1, -1], [-2, 2, -1, 1], [2, -2, 1, -1], [2, 2, 1, 1]];
+
+        // 單一棋子的「偽合法」走法（不檢查自己是否被將軍；將帥對面視為可吃對方將帥）
+        function ccGen(board, idx) {
+            const p = board[idx];
+            if (!p) return [];
+            const side = p[0], t = p[2], red = side === '紅', r = Math.floor(idx / 9), c = idx % 9, out = [];
+            const inB = (nr, nc) => nr >= 0 && nr < 10 && nc >= 0 && nc < 9;
+
+            if (t === '車') {
+                for (const [dr, dc] of CC_ORTH) {
+                    let nr = r + dr, nc = c + dc;
+                    while (inB(nr, nc)) {
+                        const q = board[nr * 9 + nc];
+                        if (!q) out.push(nr * 9 + nc);
+                        else { if (q[0] !== side) out.push(nr * 9 + nc); break; }
+                        nr += dr; nc += dc;
+                    }
+                }
+            } else if (t === '砲' || t === '包') {
+                for (const [dr, dc] of CC_ORTH) {
+                    let nr = r + dr, nc = c + dc, jumped = false;
+                    while (inB(nr, nc)) {
+                        const q = board[nr * 9 + nc];
+                        if (!jumped) { if (!q) out.push(nr * 9 + nc); else jumped = true; }
+                        else if (q) { if (q[0] !== side) out.push(nr * 9 + nc); break; }
+                        nr += dr; nc += dc;
+                    }
+                }
+            } else if (t === '馬') {
+                for (const [dr, dc, br, bc] of CC_HORSE) {
+                    const lr = r + br, lc = c + bc, nr = r + dr, nc = c + dc;
+                    if (!inB(lr, lc) || board[lr * 9 + lc]) continue;   // 拐馬腳
+                    if (!inB(nr, nc)) continue;
+                    const q = board[nr * 9 + nc];
+                    if (!q || q[0] !== side) out.push(nr * 9 + nc);
+                }
+            } else if (t === '相' || t === '象') {
+                for (const [dr, dc, br, bc] of CC_ELEPHANT) {
+                    const nr = r + dr, nc = c + dc;
+                    if (!inB(nr, nc)) continue;
+                    if (red ? nr < 5 : nr > 4) continue;                // 不能過河
+                    if (board[(r + br) * 9 + (c + bc)]) continue;       // 塞象眼
+                    const q = board[nr * 9 + nc];
+                    if (!q || q[0] !== side) out.push(nr * 9 + nc);
+                }
+            } else if (t === '仕' || t === '士') {
+                for (const [dr, dc] of CC_DIAG) {
+                    const nr = r + dr, nc = c + dc;
+                    if (nc < 3 || nc > 5 || (red ? (nr < 7 || nr > 9) : (nr < 0 || nr > 2))) continue;
+                    const q = board[nr * 9 + nc];
+                    if (!q || q[0] !== side) out.push(nr * 9 + nc);
+                }
+            } else if (t === '帥' || t === '將') {
+                for (const [dr, dc] of CC_ORTH) {
+                    const nr = r + dr, nc = c + dc;
+                    if (nc < 3 || nc > 5 || (red ? (nr < 7 || nr > 9) : (nr < 0 || nr > 2))) continue;
+                    const q = board[nr * 9 + nc];
+                    if (!q || q[0] !== side) out.push(nr * 9 + nc);
+                }
+                // 飛將：同一直線上中間無子，可「吃」對方將帥（代表此局面對面違規）
+                const d = red ? -1 : 1;
+                let nr = r + d;
+                while (nr >= 0 && nr < 10) {
+                    const q = board[nr * 9 + c];
+                    if (q) { if (q[0] !== side && (q[2] === '帥' || q[2] === '將')) out.push(nr * 9 + c); break; }
+                    nr += d;
+                }
+            } else if (t === '兵' || t === '卒') {
+                const dir = red ? -1 : 1, nr = r + dir;
+                if (nr >= 0 && nr < 10) { const q = board[nr * 9 + c]; if (!q || q[0] !== side) out.push(nr * 9 + c); }
+                const crossed = red ? r <= 4 : r >= 5;
+                if (crossed) {
+                    for (const dc of [-1, 1]) {
+                        const nc = c + dc;
+                        if (nc >= 0 && nc < 9) { const q = board[r * 9 + nc]; if (!q || q[0] !== side) out.push(r * 9 + nc); }
+                    }
+                }
+            }
+            return out;
+        }
+
+        function ccFindGeneral(board, side) {
+            for (let i = 0; i < 90; i++) { const p = board[i]; if (p && p[0] === side && (p[2] === '帥' || p[2] === '將')) return i; }
+            return -1;
+        }
+
+        function ccInCheck(board, side) {
+            const g = ccFindGeneral(board, side);
+            if (g < 0) return true;
+            const enemy = side === '紅' ? '黑' : '紅';
+            for (let i = 0; i < 90; i++) {
+                const p = board[i];
+                if (p && p[0] === enemy && ccGen(board, i).includes(g)) return true;
+            }
+            return false;
+        }
+
+        // 完全合法的走法：走完後自己不能被將軍（含將帥對面）
+        function ccLegalMoves(board, side, onlyFrom) {
+            const moves = [];
+            for (let i = 0; i < 90; i++) {
+                if (onlyFrom !== undefined && onlyFrom !== i) continue;
+                const p = board[i];
+                if (!p || p[0] !== side) continue;
+                for (const to of ccGen(board, i)) {
+                    const cap = board[to];
+                    board[to] = p; board[i] = '';
+                    const bad = ccInCheck(board, side);
+                    board[i] = p; board[to] = cap;
+                    if (!bad) moves.push({ from: i, to });
+                }
+            }
+            return moves;
+        }
+        function ccLegalDests(board, idx) {
+            const p = board[idx];
+            if (!p) return [];
+            return ccLegalMoves(board, p[0], idx).map(m => m.to);
+        }
+
+        function ccEval(board, side) {
+            let s = 0;
+            for (let i = 0; i < 90; i++) {
+                const p = board[i]; if (!p) continue;
+                let v = CC_VAL[p[2]];
+                if (p[2] === '兵' && Math.floor(i / 9) <= 4) v += 100;
+                if (p[2] === '卒' && Math.floor(i / 9) >= 5) v += 100;
+                s += (p[0] === side) ? v : -v;
+            }
+            return s;
+        }
+
+        function ccSearch(board, side, depth, alpha, beta) {
+            if (depth === 0) return ccEval(board, side);
+            const opp = side === '紅' ? '黑' : '紅';
+            const moves = [];
+            for (let i = 0; i < 90; i++) {
+                const p = board[i];
+                if (!p || p[0] !== side) continue;
+                for (const to of ccGen(board, i)) {
+                    const q = board[to];
+                    moves.push({ f: i, t: to, w: q ? CC_VAL[q[2]] + 1000 - CC_VAL[p[2]] / 10 : 0 });
+                }
+            }
+            moves.sort((a, b) => b.w - a.w);
+            let best = -Infinity;
+            for (const m of moves) {
+                const cap = board[m.t];
+                if (cap && (cap[2] === '帥' || cap[2] === '將')) return 100000 + depth;
+                const mover = board[m.f];
+                board[m.t] = mover; board[m.f] = '';
+                const v = -ccSearch(board, opp, depth - 1, -beta, -alpha);
+                board[m.f] = mover; board[m.t] = cap;
+                if (v > best) best = v;
+                if (best > alpha) alpha = best;
+                if (alpha >= beta) break;
+            }
+            return best === -Infinity ? -100000 : best;
+        }
+
+        function ccAIMove(opp) {
+            if (gameOver) return;
+            const moves = ccLegalMoves(gameState, '黑');
+            if (moves.length === 0) return;
+            const diff = parseInt(document.getElementById('board-diff').value);
+            let chosen;
+            if (diff === 1) {
+                chosen = moves[Math.floor(Math.random() * moves.length)];
+            } else {
+                const depth = diff === 2 ? 2 : 3;
+                const board = gameState.slice();
+                let bestScore = -Infinity;
+                for (const m of moves) {
+                    const mover = board[m.from], cap = board[m.to];
+                    board[m.to] = mover; board[m.from] = '';
+                    const v = -ccSearch(board, '紅', depth - 1, -Infinity, Infinity) + Math.random() * 4;
+                    board[m.from] = mover; board[m.to] = cap;
+                    if (v > bestScore) { bestScore = v; chosen = m; }
+                }
+            }
+            doCChessMove(chosen.from, chosen.to, opp);
+        }
+
+        function initChineseChess(container, opp) {
+            currentPlayer = '紅';
+            setStatus(`輪到玩家：${currentPlayer}`);
+            gameState = Array(90).fill('');
+            const rPieces = ['車', '馬', '相', '仕', '帥', '仕', '相', '馬', '車'], bPieces = ['車', '馬', '象', '士', '將', '士', '象', '馬', '車'];
+            for (let i = 0; i < 9; i++) gameState[i] = '黑_' + bPieces[i];
+            for (let i = 0; i < 9; i++) gameState[9 * 9 + i] = '紅_' + rPieces[i];
+            gameState[2 * 9 + 1] = '黑_包'; gameState[2 * 9 + 7] = '黑_包';
+            gameState[7 * 9 + 1] = '紅_砲'; gameState[7 * 9 + 7] = '紅_砲';
+            for (let i = 0; i < 9; i += 2) { gameState[3 * 9 + i] = '黑_卒'; gameState[6 * 9 + i] = '紅_兵'; }
+
+            const wrapper = document.createElement('div'); wrapper.className = 'cchess-board-wrapper';
+            let svgHTML = `<svg class="cchess-svg" viewBox="0 0 400 440"><g stroke="#5c3a21" stroke-width="2" fill="none">`;
+            for (let r = 0; r < 10; r++) { const p1 = getCChessPos(r, 0), p2 = getCChessPos(r, 8); svgHTML += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" />`; }
+            for (let c = 0; c < 9; c++) {
+                const p1 = getCChessPos(0, c), p2 = getCChessPos(4, c), p3 = getCChessPos(5, c), p4 = getCChessPos(9, c);
+                if (c === 0 || c === 8) svgHTML += `<line x1="${p1.x}" y1="${p1.y}" x2="${p4.x}" y2="${p4.y}" />`;
+                else svgHTML += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" /><line x1="${p3.x}" y1="${p3.y}" x2="${p4.x}" y2="${p4.y}" />`;
+            }
+            // 九宮格斜線（原本座標寫錯成 .y，已修正）
+            const a1 = getCChessPos(0, 3), a2 = getCChessPos(2, 5), b1 = getCChessPos(0, 5), b2 = getCChessPos(2, 3);
+            const c1 = getCChessPos(7, 3), c2 = getCChessPos(9, 5), d1 = getCChessPos(7, 5), d2 = getCChessPos(9, 3);
+            svgHTML += `<line x1="${a1.x}" y1="${a1.y}" x2="${a2.x}" y2="${a2.y}" /><line x1="${b1.x}" y1="${b1.y}" x2="${b2.x}" y2="${b2.y}" />`;
+            svgHTML += `<line x1="${c1.x}" y1="${c1.y}" x2="${c2.x}" y2="${c2.y}" /><line x1="${d1.x}" y1="${d1.y}" x2="${d2.x}" y2="${d2.y}" /></g>`;
+            svgHTML += `<text x="100" y="228" font-size="22" font-family="標楷體, serif" fill="#5c3a21" font-weight="bold">楚 河</text><text x="245" y="228" font-size="22" font-family="標楷體, serif" fill="#5c3a21" font-weight="bold">漢 界</text></svg>`;
+            wrapper.innerHTML = svgHTML; container.appendChild(wrapper);
+            renderCChessBoard(opp);
+        }
+
+        function renderCChessBoard(opp) {
+            const wrapper = document.querySelector('.cchess-board-wrapper'); if (!wrapper) return;
+            wrapper.querySelectorAll('.cchess-piece, .cchess-hint-point').forEach(el => el.remove());
+            gameState.forEach((val, idx) => {
+                if (!val) return;
+                const r = Math.floor(idx / 9), c = idx % 9, pos = getCChessPos(r, c), pieceEl = document.createElement('div');
+                const parts = val.split('_'), side = parts[0], name = parts[1];
+                pieceEl.className = `cchess-piece ${side === '紅' ? 'red' : 'black'}`;
+                if (idx === selectedIndex) pieceEl.classList.add('selected');
+                pieceEl.style.left = `${pos.x}px`; pieceEl.style.top = `${pos.y}px`; pieceEl.innerText = name;
+                pieceEl.onclick = (e) => { e.stopPropagation(); handleCChessClick(idx, opp); };
+                wrapper.appendChild(pieceEl);
+            });
+            hintMoves.forEach(targetIdx => {
+                const r = Math.floor(targetIdx / 9), c = targetIdx % 9, pos = getCChessPos(r, c), hintEl = document.createElement('div');
+                hintEl.className = 'cchess-hint-point'; hintEl.style.left = `${pos.x}px`; hintEl.style.top = `${pos.y}px`;
+                hintEl.onclick = (e) => { e.stopPropagation(); handleCChessClick(targetIdx, opp); };
+                wrapper.appendChild(hintEl);
+            });
+        }
+
+        function handleCChessClick(idx, opp) {
+            if (gameOver || isAITurn('cchess', opp)) return;
+            const p = gameState[idx];
+            if (selectedIndex !== -1 && hintMoves.includes(idx)) { doCChessMove(selectedIndex, idx, opp); return; }
+            if (p && p[0] === currentPlayer) { selectedIndex = idx; hintMoves = ccLegalDests(gameState, idx); }
+            else { selectedIndex = -1; hintMoves = []; }
+            renderCChessBoard(opp);
+        }
+
+        function doCChessMove(from, to, opp) {
+            const mover = gameState[from], target = gameState[to];
+            const r1 = Math.floor(from / 9), c1 = from % 9, r2 = Math.floor(to / 9), c2 = to % 9;
+            gameState[to] = mover; gameState[from] = '';
+            selectedIndex = -1; hintMoves = [];
+            logMove('cchess', `${mover.replace('_', '')}：(${r1 + 1},${c1 + 1})➔(${r2 + 1},${c2 + 1})${target ? ' 吃 ' + target.split('_')[1] : ''}`);
+
+            const next = currentPlayer === '紅' ? '黑' : '紅';
+            const hasMoves = ccLegalMoves(gameState, next).length > 0;
+            const inCheck = ccInCheck(gameState, next);
+            if (!hasMoves) {   // 象棋規則：被將死或無子可動（困斃）都判負
+                setStatus(`🎉 玩家 [ ${currentPlayer} ] 獲得勝利！`);
+                logMove('cchess', `🏆 ${currentPlayer} 獲勝`);
+                gameOver = true; renderCChessBoard(opp); return;
+            }
+            currentPlayer = next;
+            setStatus(`輪到玩家：${currentPlayer}${inCheck ? '　⚠️ 將軍！' : ''}`);
+            renderCChessBoard(opp);
+            if (isAITurn('cchess', opp)) scheduleAI(() => ccAIMove(opp), 400);
+        }
+
+        /* ---------- 格子類棋盤（圈叉 / 五子棋 / 黑白棋 / 跳棋） ---------- */
+        function initStandardGridGame(mode, opp, container) {
+            let cols = mode === 'gomoku' ? 15 : 8, rows = cols;
+            if (mode === 'ttt3') { cols = 3; rows = 3; }
+            gameState = Array(cols * rows).fill('');
+            if (mode === 'reversi') {
+                currentPlayer = '黑棋';
+                gameState[3 * 8 + 3] = '白棋'; gameState[3 * 8 + 4] = '黑棋';
+                gameState[4 * 8 + 3] = '黑棋'; gameState[4 * 8 + 4] = '白棋';
+            } else if (mode === 'checkers') {
+                currentPlayer = '紅棋';
+                for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) gameState[r * 8 + c] = '藍棋';
+                for (let r = 5; r < 8; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) gameState[r * 8 + c] = '紅棋';
+            } else currentPlayer = mode === 'gomoku' ? '黑棋' : 'X';
+
+            setStatus(`輪到玩家：${currentPlayer}`);
+            container.className = 'board-container';
+            const cellSize = mode === 'gomoku' ? '24px' : (mode === 'ttt3' ? '70px' : '42px');
+            container.style.gridTemplateColumns = `repeat(${cols}, ${cellSize})`;
+
+            for (let i = 0; i < cols * rows; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'board-cell';
+                cell.style.width = cellSize;
+                cell.style.height = cellSize;
+                if (mode === 'ttt3') cell.style.fontSize = '2rem';
+                if (mode === 'gomoku') cell.style.fontSize = '14px';
+                if (mode === 'checkers') {
+                    const r = Math.floor(i / 8), c = i % 8;
+                    cell.style.background = (r + c) % 2 === 1 ? '#475569' : '#0f172a';
+                    cell.style.fontSize = '1.3rem';
+                }
+                cell.onclick = () => handleCellClick(i, cols, rows, mode, opp);
+                container.appendChild(cell);
+            }
+            renderBoard(mode, cols);
+        }
+
+        function handleCellClick(idx, cols, rows, mode, opp) {
+            if (gameOver || isAITurn(mode, opp)) return;
+
+            if (mode === 'checkers') { handleCheckersClick(idx, opp); return; }
+
+            if (mode === 'reversi') {
+                const flips = getReversiFlips(idx, currentPlayer);
+                if (flips.length > 0) {
+                    gameState[idx] = currentPlayer;
+                    logMove(mode, `${currentPlayer} 落子於 (${Math.floor(idx / 8) + 1}, ${(idx % 8) + 1}) [吃 ${flips.length} 子]`);
+                    flips.forEach(i => gameState[i] = currentPlayer);
+                    switchReversiPlayer(cols, opp);
+                }
+                return;
+            }
+
+            if (gameState[idx] !== '') return;
+
+            gameState[idx] = currentPlayer;
+            logMove(mode, `玩家 [ ${currentPlayer} ] 落子於 (${Math.floor(idx / cols) + 1}, ${(idx % cols) + 1})`);
+            renderBoard(mode, cols);
+
+            if (checkWin(currentPlayer, mode, cols, rows, mode === 'gomoku' ? 5 : 3)) {
+                setStatus(`🎉 玩家 [ ${currentPlayer} ] 獲勝！`);
+                logMove(mode, `🏆 遊戲結束，獲勝者：${currentPlayer}`);
+                gameOver = true;
+                return;
+            }
+            if (gameState.every(cell => cell !== '')) {
+                setStatus(`🤝 雙方平手！`);
+                logMove(mode, `🤝 遊戲結束，平手`);
+                gameOver = true;
+                return;
+            }
+
+            currentPlayer = mode === 'gomoku' ? (currentPlayer === '黑棋' ? '白棋' : '黑棋') : (currentPlayer === 'X' ? 'O' : 'X');
+            setStatus(`輪到玩家：${currentPlayer}`);
+            if (isAITurn(mode, opp)) scheduleAI(() => triggerAIMove(mode, cols, rows, opp), 350);
+        }
+
+        /* ---------- 黑白棋 ---------- */
+        function getReversiFlips(idx, player) {
+            if (gameState[idx] !== '') return [];
+            const opponent = player === '黑棋' ? '白棋' : '黑棋';
+            const dirs = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+            const r = Math.floor(idx / 8), c = idx % 8;
+            let flips = [];
+            dirs.forEach(([dr, dc]) => {
+                const temp = [];
+                let nr = r + dr, nc = c + dc;
+                while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && gameState[nr * 8 + nc] === opponent) {
+                    temp.push(nr * 8 + nc);
+                    nr += dr; nc += dc;
+                }
+                if (temp.length > 0 && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && gameState[nr * 8 + nc] === player) {
+                    flips = flips.concat(temp);
+                }
+            });
+            return flips;
+        }
+
+        function getValidReversiMoves(player) {
+            const validMoves = [];
+            for (let i = 0; i < 64; i++) if (getReversiFlips(i, player).length > 0) validMoves.push(i);
+            return validMoves;
+        }
+
+        function switchReversiPlayer(cols, opp) {
+            const nextPlayer = currentPlayer === '黑棋' ? '白棋' : '黑棋';
+            if (getValidReversiMoves(nextPlayer).length > 0) {
+                currentPlayer = nextPlayer;
+                setStatus(`輪到玩家：${currentPlayer}`);
+            } else if (getValidReversiMoves(currentPlayer).length === 0) {
+                gameOver = true;
+                const b = gameState.filter(x => x === '黑棋').length, w = gameState.filter(x => x === '白棋').length;
+                let resultText = `比分 黑棋:${b} vs 白棋:${w}。`;
+                if (b > w) resultText += ' 🎉 黑棋勝！'; else if (w > b) resultText += ' 🎉 白棋勝！'; else resultText += ' 🤝 平手！';
+                setStatus(`🏆 遊戲結束！${resultText}`);
+                logMove('reversi', `🏆 遊戲結束！${resultText}`);
+                renderBoard('reversi', 8);
+                return;
+            } else {
+                logMove('reversi', `⚠️ ${nextPlayer} 無子可落，跳過回合！`);
+                setStatus(`⚠️ ${nextPlayer} 無子可下，繼續輪到 ${currentPlayer}`);
+            }
+            renderBoard('reversi', 8);
+            if (isAITurn('reversi', opp)) scheduleAI(() => triggerAIMove('reversi', cols, 8, opp), 400);
+        }
+
+        // 黑白棋位置權重（角落高、角旁危險）
+        const REVERSI_WEIGHTS = [
+            100, -20, 10, 5, 5, 10, -20, 100,
+            -20, -50, -2, -2, -2, -2, -50, -20,
+            10, -2, -1, -1, -1, -1, -2, 10,
+            5, -2, -1, -1, -1, -1, -2, 5,
+            5, -2, -1, -1, -1, -1, -2, 5,
+            10, -2, -1, -1, -1, -1, -2, 10,
+            -20, -50, -2, -2, -2, -2, -50, -20,
+            100, -20, 10, 5, 5, 10, -20, 100
+        ];
+
+        /* ---------- 勝負判斷（圈叉 / 五子棋） ---------- */
+        function checkWinConditionForBoard(board, player, targetCount, cols, rows) {
+            const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r * cols + c] !== player) continue;
+                    for (const [dr, dc] of dirs) {
+                        let count = 0;
+                        for (let k = 0; k < targetCount; k++) {
+                            const nr = r + dr * k, nc = c + dc * k;
+                            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr * cols + nc] === player) count++; else break;
+                        }
+                        if (count === targetCount) return true;
+                    }
+                }
+            }
+            return false;
+        }
+        function checkWin(player, mode, cols, rows, target) {
+            return checkWinConditionForBoard(gameState, player, target, cols, rows);
+        }
+
+        function minimaxTicTacToe(board, isMaximizing, aiSymbol, playerSymbol, depth) {
+            if (checkWinConditionForBoard(board, aiSymbol, 3, 3, 3)) return { score: 10 - depth };
+            if (checkWinConditionForBoard(board, playerSymbol, 3, 3, 3)) return { score: depth - 10 };
+            if (board.every(cell => cell !== '')) return { score: 0 };
+            const empties = board.map((v, i) => v === '' ? i : -1).filter(i => i !== -1);
+            let bestScore = isMaximizing ? -100 : 100, bestMove = -1;
+            for (const idx of empties) {
+                board[idx] = isMaximizing ? aiSymbol : playerSymbol;
+                const res = minimaxTicTacToe(board, !isMaximizing, aiSymbol, playerSymbol, depth + 1);
+                board[idx] = '';
+                if (isMaximizing ? res.score > bestScore : res.score < bestScore) { bestScore = res.score; bestMove = idx; }
+            }
+            return { score: bestScore, move: bestMove };
+        }
+
+        /* ---------- 五子棋 AI：棋型評分 ---------- */
+        const GM_DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        function gmLineValue(count, open) {
+            if (count >= 5) return 1000000;
+            if (open === 0) return 0;
+            const t = { 4: [0, 10000, 100000], 3: [0, 500, 5000], 2: [0, 50, 500], 1: [0, 1, 10] };
+            return t[count][open];
+        }
+        // 假設 p 下在 idx，這一手形成的棋型分數
+        function gmPatternScore(board, idx, p, cols, rows) {
+            const r = Math.floor(idx / cols), c = idx % cols;
+            let total = 0;
+            for (const [dr, dc] of GM_DIRS) {
+                let count = 1, open = 0;
+                for (const s of [1, -1]) {
+                    let nr = r + dr * s, nc = c + dc * s;
+                    while (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr * cols + nc] === p) { count++; nr += dr * s; nc += dc * s; }
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr * cols + nc] === '') open++;
+                }
+                total += gmLineValue(count, open);
+            }
+            return total;
+        }
+        function gomokuPickMove(diff, cols, rows, ai, human) {
+            const near = new Set();
+            let hasStone = false;
+            for (let i = 0; i < gameState.length; i++) {
+                if (gameState[i] === '') continue;
+                hasStone = true;
+                const r = Math.floor(i / cols), c = i % cols;
+                for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+                    const nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && gameState[nr * cols + nc] === '') near.add(nr * cols + nc);
+                }
+            }
+            if (!hasStone) return Math.floor(rows / 2) * cols + Math.floor(cols / 2);
+            const list = [...near];
+            const scored = list.map(i => ({ i, atk: gmPatternScore(gameState, i, ai, cols, rows), def: gmPatternScore(gameState, i, human, cols, rows) }));
+
+            // 能一步獲勝就下；對方一步獲勝就擋
+            const win = scored.find(s => s.atk >= 1000000);
+            if (win) return win.i;
+            const block = scored.find(s => s.def >= 1000000);
+            if (block) return block.i;
+
+            if (diff === 1) {
+                const four = scored.find(s => s.def >= 10000);   // 簡單：只會擋四連
+                if (four) return four.i;
+                return list[Math.floor(Math.random() * list.length)];
+            }
+            scored.forEach(s => { s.score = diff === 3 ? s.atk + s.def * 0.95 : s.atk * 0.7 + s.def + Math.random() * 300; });
+            scored.sort((a, b) => b.score - a.score);
+            if (diff === 2 && scored.length > 1 && Math.random() < 0.15) return scored[1].i;
+            return scored[0].i;
+        }
+
+        /* ---------- 圈圈叉叉 / 五子棋 / 黑白棋 AI ---------- */
+        function triggerAIMove(mode, cols, rows, opp) {
+            if (gameOver) return;
+            const diff = parseInt(document.getElementById('board-diff').value);
+            const aiSymbol = mode === 'ttt3' ? 'O' : '白棋';
+            const playerSymbol = mode === 'ttt3' ? 'X' : '黑棋';
+            let chosenMove = -1;
+
+            if (mode === 'reversi') {
+                const validMoves = getValidReversiMoves('白棋');
+                if (validMoves.length === 0) { switchReversiPlayer(cols, opp); return; }
+                if (diff === 3) {
+                    let bestScore = -99999;
+                    validMoves.forEach(idx => {
+                        const score = REVERSI_WEIGHTS[idx] + getReversiFlips(idx, '白棋').length * 2 + Math.random();
+                        if (score > bestScore) { bestScore = score; chosenMove = idx; }
+                    });
+                } else if (diff === 2) {
+                    let maxFlips = -1;
+                    validMoves.forEach(idx => {
+                        const n = getReversiFlips(idx, '白棋').length + Math.random() * 0.5;
+                        if (n > maxFlips) { maxFlips = n; chosenMove = idx; }
+                    });
+                } else {
+                    chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                }
+                const flips = getReversiFlips(chosenMove, '白棋');
+                gameState[chosenMove] = '白棋';
+                flips.forEach(i => gameState[i] = '白棋');
+                logMove(mode, `AI [ 白棋 ] 落子於 (${Math.floor(chosenMove / 8) + 1}, ${(chosenMove % 8) + 1}) [吃 ${flips.length} 子]`);
+                switchReversiPlayer(cols, opp);
+                return;
+            }
+
+            const emptyIndices = gameState.map((v, i) => v === '' ? i : -1).filter(i => i !== -1);
+            if (emptyIndices.length === 0) return;
+
+            if (mode === 'ttt3') {
+                if (diff === 3) {
+                    chosenMove = minimaxTicTacToe([...gameState], true, aiSymbol, playerSymbol, 0).move;
+                } else if (diff === 2) {
+                    for (const idx of emptyIndices) {           // 先自己能贏就贏
+                        const b = [...gameState]; b[idx] = aiSymbol;
+                        if (checkWinConditionForBoard(b, aiSymbol, 3, 3, 3)) { chosenMove = idx; break; }
+                    }
+                    if (chosenMove === -1) for (const idx of emptyIndices) {   // 再擋對手
+                        const b = [...gameState]; b[idx] = playerSymbol;
+                        if (checkWinConditionForBoard(b, playerSymbol, 3, 3, 3)) { chosenMove = idx; break; }
+                    }
+                    if (chosenMove === -1) chosenMove = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+                } else {
+                    chosenMove = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+                }
+            } else if (mode === 'gomoku') {
+                chosenMove = gomokuPickMove(diff, cols, rows, aiSymbol, playerSymbol);
+            }
+
+            if (chosenMove === -1 || chosenMove === undefined) return;
+            gameState[chosenMove] = aiSymbol;
+            logMove(mode, `AI [ ${aiSymbol} ] 落子於 (${Math.floor(chosenMove / cols) + 1}, ${(chosenMove % cols) + 1})`);
+            renderBoard(mode, cols);
+
+            if (checkWin(aiSymbol, mode, cols, rows, mode === 'gomoku' ? 5 : 3)) {
+                setStatus(`🤖 AI 獲勝！`);
+                logMove(mode, `🏆 遊戲結束，獲勝者：AI`);
+                gameOver = true;
+                return;
+            }
+            if (gameState.every(cell => cell !== '')) {
+                setStatus(`🤝 雙方平手！`);
+                logMove(mode, `🤝 遊戲結束，平手`);
+                gameOver = true;
+                return;
+            }
+            currentPlayer = playerSymbol;
+            setStatus(`輪到玩家：${currentPlayer}`);
+        }
+
+        /* ---------- 西洋跳棋（美式規則：強制吃子、連跳、到底線升王） ---------- */
+        // 以「單步」為單位：{from, to, cap}，cap=-1 代表一般移動
+        function ckSteps(board, side, from) {
+            const p = board[from], jumps = [], slides = [];
+            if (!p || p[0] !== side) return { jumps, slides };
+            const king = p[1] === '王', fwd = side === '紅' ? -1 : 1;
+            const dirs = king ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : [[fwd, -1], [fwd, 1]];
+            const r = Math.floor(from / 8), c = from % 8;
+            for (const [dr, dc] of dirs) {
+                const nr = r + dr, nc = c + dc;
+                if (nr < 0 || nr > 7 || nc < 0 || nc > 7) continue;
+                const t = board[nr * 8 + nc];
+                if (t === '') slides.push({ from, to: nr * 8 + nc, cap: -1 });
+                else if (t[0] !== side) {
+                    const jr = r + 2 * dr, jc = c + 2 * dc;
+                    if (jr >= 0 && jr < 8 && jc >= 0 && jc < 8 && board[jr * 8 + jc] === '') jumps.push({ from, to: jr * 8 + jc, cap: nr * 8 + nc });
+                }
+            }
+            return { jumps, slides };
+        }
+        function ckAllMoves(board, side, chain) {
+            if (chain !== -1) return ckSteps(board, side, chain).jumps;
+            let jumps = [], slides = [];
+            for (let i = 0; i < 64; i++) {
+                if (board[i] && board[i][0] === side) {
+                    const s = ckSteps(board, side, i);
+                    jumps = jumps.concat(s.jumps); slides = slides.concat(s.slides);
+                }
+            }
+            return jumps.length ? jumps : slides;   // 有得吃就必須吃
+        }
+        function ckApply(board, m) {
+            const b = board.slice();
+            let piece = b[m.from];
+            const side = piece[0];
+            b[m.from] = '';
+            if (m.cap >= 0) b[m.cap] = '';
+            const row = Math.floor(m.to / 8);
+            let promoted = false;
+            if (piece[1] !== '王' && ((side === '紅' && row === 0) || (side === '藍' && row === 7))) { piece = side + '王'; promoted = true; }
+            b[m.to] = piece;
+            let chain = -1;
+            if (m.cap >= 0 && !promoted && ckSteps(b, side, m.to).jumps.length > 0) chain = m.to;   // 還能連跳（升王就結束）
+            return { board: b, chain, promoted };
+        }
+        function ckEval(board) {   // 藍棋(AI)視角
+            let s = 0;
+            for (let i = 0; i < 64; i++) {
+                const p = board[i]; if (!p) continue;
+                const r = Math.floor(i / 8);
+                const v = p[1] === '王' ? 170 : 100 + (p[0] === '藍' ? r : 7 - r) * 4;
+                s += p[0] === '藍' ? v : -v;
+            }
+            return s;
+        }
+        function ckSearch(board, side, chain, depth, alpha, beta) {
+            const moves = ckAllMoves(board, side, chain);
+            if (moves.length === 0) return side === '藍' ? -10000 - depth : 10000 + depth;
+            if (depth === 0) return ckEval(board);
+            const opp = side === '紅' ? '藍' : '紅';
+            if (side === '藍') {
+                let best = -Infinity;
+                for (const m of moves) {
+                    const r = ckApply(board, m);
+                    const v = ckSearch(r.board, r.chain !== -1 ? side : opp, r.chain, depth - 1, alpha, beta);
+                    if (v > best) best = v;
+                    if (best > alpha) alpha = best;
+                    if (beta <= alpha) break;
+                }
+                return best;
+            } else {
+                let best = Infinity;
+                for (const m of moves) {
+                    const r = ckApply(board, m);
+                    const v = ckSearch(r.board, r.chain !== -1 ? side : opp, r.chain, depth - 1, alpha, beta);
+                    if (v < best) best = v;
+                    if (best < beta) beta = best;
+                    if (beta <= alpha) break;
+                }
+                return best;
+            }
+        }
+        function ckAIMove(opp) {
+            if (gameOver) return;
+            const moves = ckAllMoves(gameState, '藍', ckChain);
+            if (moves.length === 0) return;
+            const diff = parseInt(document.getElementById('board-diff').value);
+            let chosen;
+            if (diff === 1) chosen = moves[Math.floor(Math.random() * moves.length)];
+            else {
+                const depth = diff === 2 ? 3 : 7;
+                let bestScore = -Infinity;
+                for (const m of moves) {
+                    const r = ckApply(gameState, m);
+                    const v = ckSearch(r.board, r.chain !== -1 ? '藍' : '紅', r.chain, depth - 1, -Infinity, Infinity) + Math.random() * 0.5;
+                    if (v > bestScore) { bestScore = v; chosen = m; }
+                }
+            }
+            doCheckersMove(chosen, opp);
+        }
+
+        function handleCheckersClick(idx, opp) {
+            const side = currentPlayer[0];
+            const moves = ckAllMoves(gameState, side, ckChain);
+            if (selectedIndex !== -1) {
+                const m = moves.find(x => x.from === selectedIndex && x.to === idx);
+                if (m) { doCheckersMove(m, opp); return; }
+            }
+            if (ckChain !== -1) { selectedIndex = ckChain; }   // 連跳中只能操作同一顆棋
+            else if (gameState[idx] && gameState[idx][0] === side && moves.some(x => x.from === idx)) selectedIndex = idx;
+            else selectedIndex = -1;
+            hintMoves = moves.filter(x => x.from === selectedIndex).map(x => x.to);
+            renderBoard('checkers', 8);
+        }
+
+        function doCheckersMove(m, opp) {
+            const side = currentPlayer[0];
+            const wasMan = gameState[m.from][1] !== '王';
+            const r = ckApply(gameState, m);
+            gameState = r.board;
+            logMove('checkers', `${currentPlayer} (${Math.floor(m.from / 8) + 1},${(m.from % 8) + 1})➔(${Math.floor(m.to / 8) + 1},${(m.to % 8) + 1})${m.cap >= 0 ? ' 吃子' : ''}${r.promoted ? ' 升王👑' : ''}`);
+            ckQuiet = (m.cap >= 0 || wasMan) ? 0 : ckQuiet + 1;
+            ckChain = r.chain;
+
+            if (ckChain !== -1) {   // 還要繼續連跳
+                selectedIndex = ckChain;
+                hintMoves = ckAllMoves(gameState, side, ckChain).map(x => x.to);
+                setStatus(`${currentPlayer} 必須繼續連跳！`);
+                renderBoard('checkers', 8);
+                if (isAITurn('checkers', opp)) scheduleAI(() => ckAIMove(opp), 400);
+                return;
+            }
+            selectedIndex = -1; hintMoves = [];
+            const nextSide = side === '紅' ? '藍' : '紅';
+            if (ckAllMoves(gameState, nextSide, -1).length === 0) {   // 對方沒棋或無路可走 → 勝
+                gameOver = true;
+                setStatus(`🎉 玩家 [ ${currentPlayer} ] 獲勝！`);
+                logMove('checkers', `🏆 遊戲結束，獲勝者：${currentPlayer}`);
+                renderBoard('checkers', 8);
+                return;
+            }
+            if (ckQuiet >= 80) {
+                gameOver = true;
+                setStatus(`🤝 長時間無吃子，判和局`);
+                logMove('checkers', `🤝 和局`);
+                renderBoard('checkers', 8);
+                return;
+            }
+            currentPlayer = nextSide + '棋';
+            const mustCapture = ckAllMoves(gameState, nextSide, -1).some(x => x.cap >= 0);
+            setStatus(`輪到玩家：${currentPlayer}`);
+            renderBoard('checkers', 8);
+            if (isAITurn('checkers', opp)) scheduleAI(() => ckAIMove(opp), 450);
+        }
+
+        function renderBoard(mode, cols) {
+            const cells = document.querySelectorAll('#board-container .board-cell');
+            const opp = document.getElementById('board-opponent').value;
+            const validMoves = (mode === 'reversi' && !gameOver && !isAITurn('reversi', opp)) ? getValidReversiMoves(currentPlayer) : [];
+            cells.forEach((cell, idx) => {
+                const val = gameState[idx];
+                if (mode === 'checkers') {
+                    let html = '';
+                    if (val === '紅棋') html = '🔴'; else if (val === '藍棋') html = '🔵';
+                    else if (val === '紅王') html = '🔴<span class="king">👑</span>';
+                    else if (val === '藍王') html = '🔵<span class="king">👑</span>';
+                    cell.innerHTML = html;
+                    cell.classList.toggle('selected', idx === selectedIndex);
+                    cell.classList.toggle('ck-hint', hintMoves.includes(idx));
+                } else {
+                    cell.innerText = val === '黑棋' ? '⚫' : (val === '白棋' ? '⚪' : val);
+                    cell.classList.toggle('reversi-valid', validMoves.includes(idx));
+                }
+            });
+        }
+
+        /* ================= 遊戲 2 邏輯：科技塔防 ================= */
+        const TOWER_TYPES = [
+            { id: 1, name: '激光脈衝塔', cost: 50, range: 85, damage: 10, cd: 15, color: '#00f0ff', icon: '⚡', fx: 'laser' },
+            { id: 2, name: '等離子加農砲', cost: 80, range: 110, damage: 30, cd: 25, color: '#ff0055', icon: '💣', fx: 'plasma' },
+            { id: 3, name: '電子風暴塔', cost: 120, range: 100, damage: 18, cd: 20, color: '#38bdf8', icon: '🌩️', fx: 'chain' },
+            { id: 4, name: '零度凍結塔', cost: 100, range: 75, damage: 6, cd: 22, color: '#a5f3fc', icon: '❄️', fx: 'freeze' },
+            { id: 5, name: '高能光子塔', cost: 150, range: 130, damage: 40, cd: 18, color: '#facc15', icon: '🔆', fx: 'laser' },
+            { id: 6, name: '伽瑪射線塔', cost: 200, range: 160, damage: 55, cd: 30, color: '#a855f7', icon: '☢️', fx: 'laser' },
+            { id: 7, name: '反物質發射器', cost: 300, range: 145, damage: 140, cd: 35, color: '#ec4899', icon: '⚛️', fx: 'supernova' },
+            { id: 8, name: '量子震盪塔', cost: 180, range: 90, damage: 35, cd: 20, color: '#10b981', icon: '🌀', fx: 'plasma' },
+            { id: 9, name: '軌道炮打擊站', cost: 400, range: 210, damage: 280, cd: 40, color: '#f97316', icon: '🛰️', fx: 'supernova' },
+            { id: 10, name: '磁暴漩渦塔', cost: 250, range: 105, damage: 45, cd: 22, color: '#8b5cf6', icon: '🧲', fx: 'chain' },
+            { id: 11, name: '毒素噴濺塔', cost: 110, range: 80, damage: 14, cd: 18, color: '#84cc16', icon: '🧪', fx: 'poison' },
+            { id: 12, name: '奈米機械塔', cost: 140, range: 115, damage: 20, cd: 20, color: '#06b6d4', icon: '🤖', fx: 'laser' },
+            { id: 13, name: '超新星核爆塔', cost: 350, range: 150, damage: 180, cd: 38, color: '#ef4444', icon: '💥', fx: 'supernova' },
+            { id: 14, name: '聲波脈衝塔', cost: 130, range: 70, damage: 24, cd: 18, color: '#f43f5e', icon: '🔊', fx: 'plasma' },
+            { id: 15, name: '脈衝電磁塔', cost: 160, range: 100, damage: 16, cd: 22, color: '#6366f1', icon: '📡', fx: 'chain' },
+            { id: 16, name: '能量共振塔', cost: 220, range: 125, damage: 12, cd: 15, color: '#eab308', icon: '✨', fx: 'laser' },
+            { id: 17, name: '駭客干擾塔', cost: 170, range: 120, damage: 25, cd: 25, color: '#14b8a6', icon: '💻', fx: 'freeze' },
+            { id: 18, name: '時空遲滯塔', cost: 280, range: 135, damage: 10, cd: 22, color: '#3b82f6', icon: '⏳', fx: 'freeze' },
+            { id: 19, name: '虛空引力塔', cost: 320, range: 140, damage: 90, cd: 30, color: '#64748b', icon: '🕳️', fx: 'supernova' },
+            { id: 20, name: '泰坦防禦塔', cost: 500, range: 190, damage: 350, cd: 30, color: '#fbbf24', icon: '👑', fx: 'supernova' }
+        ];
+        const TD_MAX_LEVEL = 5, TD_FUSION_COST = 150;
+
+        function getDeterministicFusionResult(id1, id2) {
+            const minId = Math.min(id1, id2), maxId = Math.max(id1, id2);
+            const cantorKey = Math.floor(0.5 * (minId + maxId) * (minId + maxId + 1) + maxId);
+            const names = ["超能星雲主宰", "極寒雷暴樞紐", "時空湮滅之眼", "量子次元裂縫", "泰坦毀滅核心", "暗物質星環", "神聖光子審判", "離子風暴要塞", "虛空碎裂主砲", "終極星際矩陣"];
+            const icons = ["🌌", "❄️⚡", "👁️‍🗨️", "🌀✨", "⚛️🔥", "🪐", "🔆⚔️", "⚡🛡️", "🕳️💥", "💫"];
+            const colors = ["#ff00aa", "#00ffff", "#c084fc", "#9333ea", "#f97316", "#10b981", "#facc15", "#ef4444", "#38bdf8", "#eab308"];
+            const fxList = ["laser", "plasma", "chain", "freeze", "poison", "supernova"];
+            return {
+                name: `【融合】${names[cantorKey % names.length]}`,
+                range: 130 + (cantorKey % 70),
+                damage: 120 + (cantorKey % 250),
+                cd: Math.max(10, 22 - (cantorKey % 10)),
+                color: colors[cantorKey % colors.length],
+                icon: icons[cantorKey % icons.length],
+                fx: fxList[cantorKey % fxList.length]
+            };
+        }
+
+        let selectedTowerType = TOWER_TYPES[0];
+        let tdCanvas, tdCtx, tdLoop = null;
+        let tdIsPaused = false, tdSpeed = 1, tdMoney = 500, tdHP = 10;
+        let tdWave = 1, waveEnemiesSpawned = 0, waveEnemiesTotal = 8, waveClearCooldown = 0, spawnTimer = 0;
+        let tdTowers = [], tdEnemies = [], tdGameOver = false;
+        let selectedPlacedTower = null, fusionSourceTower = null;
+        let mouseX = -1, mouseY = -1, isHoveringCanvas = false;
+        let activeVisualEffects = [];
+        let tdMessage = '', tdMessageLife = 0;
+
+        function tdNotify(t) { tdMessage = t; tdMessageLife = 60; }
+        function updateTDHud() {
+            document.getElementById('td-money').innerText = tdMoney;
+            document.getElementById('td-hp').innerText = tdHP;
+            document.getElementById('td-wave').innerText = tdWave;
+        }
+        function tdCanvasPos(e) {
+            const r = tdCanvas.getBoundingClientRect();
+            return { x: (e.clientX - r.left) * tdCanvas.width / r.width, y: (e.clientY - r.top) * tdCanvas.height / r.height };
+        }
+
+        function initTD() {
+            tdCanvas = document.getElementById('td-canvas');
+            tdCtx = tdCanvas.getContext('2d');
+            tdMoney = 500; tdHP = 10; tdWave = 1;
+            waveEnemiesSpawned = 0; waveEnemiesTotal = 8; waveClearCooldown = 0; spawnTimer = 0;
+            tdTowers = []; tdEnemies = []; tdGameOver = false;
+            tdIsPaused = false; document.getElementById('td-pause-btn').innerText = '暫停';
+            tdSpeed = parseInt(document.getElementById('td-speed').value) || 1;
+            selectedPlacedTower = null; fusionSourceTower = null;
+            activeVisualEffects = []; tdMessage = ''; tdMessageLife = 0;
+            document.getElementById('tower-upgrade-menu').style.display = 'none';
+            updateTDHud();
+            renderTowerShop();
+
+            tdCanvas.onmousemove = (e) => { const p = tdCanvasPos(e); mouseX = p.x; mouseY = p.y; isHoveringCanvas = true; };
+            tdCanvas.onmouseleave = () => { isHoveringCanvas = false; };
+            tdCanvas.oncontextmenu = (e) => { e.preventDefault(); closeUpgradeMenu(); };
+
+            tdCanvas.onclick = (e) => {
+                if (tdGameOver) return;
+                const { x, y } = tdCanvasPos(e);
+                const clickedTower = tdTowers.find(t => Math.hypot(t.x - x, t.y - y) < 25);
+
+                if (fusionSourceTower) {
+                    if (clickedTower && clickedTower !== fusionSourceTower) executeManualFusion(fusionSourceTower, clickedTower);
+                    fusionSourceTower = null;
+                    return;
+                }
+                if (clickedTower) {
+                    selectedPlacedTower = clickedTower;
+                    showUpgradeMenu(clickedTower);
+                    return;
+                }
+                closeUpgradeMenu();
+
+                if (y > 200 && y < 280) { tdNotify('這裡是敵人路徑，不能建塔'); return; }
+                if (tdTowers.some(t => Math.hypot(t.x - x, t.y - y) < 50)) { tdNotify('離其他塔太近了'); return; }
+                if (tdMoney < selectedTowerType.cost) { tdNotify('金錢不足'); return; }
+
+                tdTowers.push({
+                    x, y, type: selectedTowerType, level: 1,
+                    damage: selectedTowerType.damage, range: selectedTowerType.range,
+                    cd: 0, angle: 0, totalInvested: selectedTowerType.cost, isFusion: false
+                });
+                tdMoney -= selectedTowerType.cost;
+                updateTDHud();
+            };
+
+            if (tdLoop) clearInterval(tdLoop);
+            tdLoop = setInterval(tdTick, 1000 / 30);
+        }
+
+        function showUpgradeMenu(tower) {
+            const menu = document.getElementById('tower-upgrade-menu');
+            const layout = menu.parentElement;
+            const lr = layout.getBoundingClientRect(), cr = tdCanvas.getBoundingClientRect();
+            const sx = cr.width / tdCanvas.width, sy = cr.height / tdCanvas.height;
+            const offX = cr.left - lr.left, offY = cr.top - lr.top;
+            let left = offX + tower.x * sx + 32;
+            if (left + 190 > offX + cr.width) left = offX + tower.x * sx - 32 - 190;
+            let top = offY + tower.y * sy - 70;
+            if (top < offY) top = offY;
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            menu.style.display = 'block';
+            updateUpgradeMenuStats(tower);
+        }
+
+        function tdUpgradeCost(t) { return Math.floor(t.type.cost * 0.8 * t.level); }
+        function tdSellPrice(t) { return Math.floor(t.totalInvested * 0.7); }
+
+        function updateUpgradeMenuStats(tower) {
+            const tierName = tower.isFusion ? '【融合進階】' : '等級: ';
+            document.getElementById('menu-tower-title').innerText = tower.type.name;
+            document.getElementById('menu-tower-stats').innerText = `${tierName}${tower.level} | 傷害: ${tower.damage} | 範圍: ${tower.range}`;
+            const upBtn = document.getElementById('menu-upgrade-btn');
+            if (tower.level >= TD_MAX_LEVEL) { upBtn.innerText = '已達最高等級'; upBtn.disabled = true; }
+            else { upBtn.innerText = `升級 $${tdUpgradeCost(tower)}`; upBtn.disabled = false; }
+            document.getElementById('menu-sell-btn').innerText = `賣出 +$${tdSellPrice(tower)}`;
+        }
+
+        function closeUpgradeMenu() {
+            selectedPlacedTower = null;
+            fusionSourceTower = null;
+            document.getElementById('tower-upgrade-menu').style.display = 'none';
+        }
+
+        function upgradeSelectedTower() {
+            const t = selectedPlacedTower;
+            if (!t || t.level >= TD_MAX_LEVEL) return;
+            const cost = tdUpgradeCost(t);
+            if (tdMoney < cost) { tdNotify('金錢不足，無法升級'); return; }
+            tdMoney -= cost;
+            t.level++;
+            t.damage = Math.floor(t.damage * 1.35);   // 傷害只在這裡成長一次（原本攻擊時又乘一次，造成重複加成）
+            t.range += 12;
+            t.totalInvested += cost;
+            updateTDHud();
+            updateUpgradeMenuStats(t);
+        }
+
+        function startManualFusion() {
+            if (!selectedPlacedTower) return;
+            if (tdMoney < TD_FUSION_COST) { tdNotify(`融合需要 $${TD_FUSION_COST}，金錢不足`); return; }
+            if (tdTowers.length < 2) { tdNotify('至少要有兩座塔才能融合'); return; }
+            fusionSourceTower = selectedPlacedTower;
+            document.getElementById('tower-upgrade-menu').style.display = 'none';
+        }
+
+        function executeManualFusion(t1, t2) {
+            if (tdMoney < TD_FUSION_COST) { tdNotify('金錢不足，融合取消'); return; }
+            tdMoney -= TD_FUSION_COST;
+            const id1 = t1.type.id || 1, id2 = t2.type.id || 1;
+            const res = getDeterministicFusionResult(id1, id2);
+            t1.type = {
+                id: Math.min(id1, id2) * 100 + Math.max(id1, id2),
+                name: res.name, cost: 500, icon: res.icon, color: res.color, fx: res.fx,
+                cd: res.cd           // 原本漏掉 cd，融合塔永遠只吃預設值
+            };
+            t1.damage = res.damage;
+            t1.range = res.range;
+            t1.level = 1;
+            t1.cd = 0;
+            t1.totalInvested += t2.totalInvested + TD_FUSION_COST;
+            t1.isFusion = true;
+            tdTowers = tdTowers.filter(t => t !== t2);
+            updateTDHud();
+            closeUpgradeMenu();
+        }
+
+        function sellSelectedTower() {
+            if (!selectedPlacedTower) return;
+            tdMoney += tdSellPrice(selectedPlacedTower);
+            tdTowers = tdTowers.filter(t => t !== selectedPlacedTower);
+            updateTDHud();
+            closeUpgradeMenu();
+        }
+
+        function renderTowerShop() {
+            const shop = document.getElementById('tower-shop');
+            shop.innerHTML = '';
+            TOWER_TYPES.forEach(t => {
+                const card = document.createElement('div');
+                card.className = `tower-card ${selectedTowerType.id === t.id ? 'selected' : ''}`;
+                card.innerHTML = `
+                    <div class="tower-icon">${t.icon}</div>
+                    <div class="tower-info">
+                        <div class="tower-name">${t.name}</div>
+                        <div class="tower-cost">$${t.cost}</div>
+                    </div>`;
+                card.onclick = () => { selectedTowerType = t; renderTowerShop(); };
+                shop.appendChild(card);
+            });
+        }
+
+        function toggleTDPause() {
+            tdIsPaused = !tdIsPaused;
+            document.getElementById('td-pause-btn').innerText = tdIsPaused ? '繼續' : '暫停';
+        }
+        function changeTDSpeed(val) { tdSpeed = parseInt(val) || 1; }   // 改成每個 tick 跑多次邏輯，不再重建計時器
+        function stopTD() { if (tdLoop) { clearInterval(tdLoop); tdLoop = null; } }
+
+        function tdTick() {
+            if (!tdIsPaused && !tdGameOver) for (let i = 0; i < tdSpeed; i++) { stepTD(); if (tdGameOver) break; }
+            if (tdMessageLife > 0) tdMessageLife--;
+            drawTD();   // 暫停時也持續重繪，建塔預覽/選單不會凍結
+        }
+
+        function stepTD() {
+            spawnTimer++;
+            if (waveEnemiesSpawned < waveEnemiesTotal) {
+                if (spawnTimer >= 30) {
+                    spawnTimer = 0;
+                    const hpVal = 70 + (tdWave - 1) * 20;
+                    const speedVal = 2.1 + (tdWave - 1) * 0.12;
+                    tdEnemies.push({ x: 0, y: 240, hp: hpVal, maxHp: hpVal, speed: speedVal, slowed: 0, poisoned: 0 });
+                    waveEnemiesSpawned++;
+                }
+            } else if (tdEnemies.length === 0) {
+                waveClearCooldown++;
+                if (waveClearCooldown > 40) {
+                    tdWave++;
+                    waveEnemiesTotal += 3;
+                    waveEnemiesSpawned = 0; waveClearCooldown = 0; spawnTimer = 0;
+                    tdMoney += 120 + tdWave * 25;
+                    updateTDHud();
+                }
+            }
+
+            // 敵人移動 / 狀態
+            for (const e of tdEnemies) {
+                let sp = e.speed;
+                if (e.slowed > 0) { sp *= 0.5; e.slowed--; }
+                if (e.poisoned > 0) { e.hp -= 0.6; e.poisoned--; }
+                e.x += sp;
+            }
+
+            // 防禦塔攻擊
+            for (const t of tdTowers) {
+                const cfg = t.type;
+                if (t.cd > 0) t.cd--;
+                let target = null;
+                for (const e of tdEnemies) {        // 優先打跑最前面的敵人
+                    if (e.hp <= 0) continue;
+                    if (Math.hypot(e.x - t.x, e.y - t.y) <= t.range && (!target || e.x > target.x)) target = e;
+                }
+                if (!target) continue;
+                t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+                if (t.cd > 0) continue;
+
+                const dmg = t.damage;
+                const fx = cfg.fx || 'laser';
+                target.hp -= dmg;
+                activeVisualEffects.push({ type: fx, x1: t.x, y1: t.y, x2: target.x, y2: target.y, color: cfg.color, life: 6 });
+
+                if (fx === 'chain') {
+                    const nextE = tdEnemies.find(e => e !== target && e.hp > 0 && Math.hypot(e.x - target.x, e.y - target.y) < 110);
+                    if (nextE) {
+                        nextE.hp -= dmg * 0.5;
+                        activeVisualEffects.push({ type: 'chain', x1: target.x, y1: target.y, x2: nextE.x, y2: nextE.y, color: cfg.color, life: 6 });
+                    }
+                } else if (fx === 'freeze') target.slowed = 70;
+                else if (fx === 'poison') target.poisoned = 90;
+                else if (fx === 'supernova') {
+                    tdEnemies.forEach(e => { if (e !== target && Math.hypot(e.x - target.x, e.y - target.y) < 85) e.hp -= dmg * 0.7; });
+                }
+                t.cd = cfg.cd || 20;
+            }
+
+            // 統一清理死亡敵人（原本只有主要目標會被移除，範圍/連鎖/毒傷致死的敵人會殘留）
+            for (let i = tdEnemies.length - 1; i >= 0; i--) {
+                if (tdEnemies[i].hp <= 0) {
+                    tdEnemies.splice(i, 1);
+                    tdMoney += 18 + tdWave * 3;
+                    updateTDHud();
+                }
+            }
+
+            // 漏怪扣血
+            for (let i = tdEnemies.length - 1; i >= 0; i--) {
+                if (tdEnemies[i].x >= 680) {
+                    tdEnemies.splice(i, 1);
+                    tdHP--;
+                    if (tdHP <= 0) { tdHP = 0; tdGameOver = true; }
+                    updateTDHud();
+                }
+            }
+
+            for (let i = activeVisualEffects.length - 1; i >= 0; i--) {
+                activeVisualEffects[i].life--;
+                if (activeVisualEffects[i].life <= 0) activeVisualEffects.splice(i, 1);
+            }
+        }
+
+        function drawTD() {
+            const ctx = tdCtx;
+            if (!ctx) return;
+            ctx.clearRect(0, 0, 680, 480);
+
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
+            for (let x = 0; x < 680; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 480); ctx.stroke(); }
+            for (let y = 0; y < 480; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(680, y); ctx.stroke(); }
+
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)'; ctx.lineWidth = 60;
+            ctx.beginPath(); ctx.moveTo(0, 240); ctx.lineTo(680, 240); ctx.stroke();
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, 240); ctx.lineTo(680, 240); ctx.stroke();
+
+            // 敵人
+            for (const e of tdEnemies) {
+                ctx.fillStyle = '#334155'; ctx.fillRect(e.x - 14, e.y - 22, 28, 4);
+                ctx.fillStyle = e.poisoned > 0 ? '#84cc16' : '#ef4444';
+                ctx.fillRect(e.x - 14, e.y - 22, (Math.max(0, e.hp) / e.maxHp) * 28, 4);
+                ctx.fillStyle = e.slowed > 0 ? '#38bdf8' : '#ef4444';
+                ctx.beginPath(); ctx.arc(e.x, e.y, 12, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.stroke();
+            }
+
+            // 選中塔的範圍
+            if (selectedPlacedTower) {
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+                ctx.beginPath(); ctx.arc(selectedPlacedTower.x, selectedPlacedTower.y, selectedPlacedTower.range, 0, Math.PI * 2); ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 建塔預覽
+            if (isHoveringCanvas && !tdGameOver && !fusionSourceTower) {
+                const onTrack = mouseY > 200 && mouseY < 280;
+                const tooClose = tdTowers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 50);
+                const overTower = tdTowers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 25);
+                if (!overTower) {
+                    const isValid = !onTrack && !tooClose && tdMoney >= selectedTowerType.cost;
+                    ctx.strokeStyle = isValid ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.arc(mouseX, mouseY, selectedTowerType.range, 0, Math.PI * 2); ctx.stroke();
+                    ctx.save();
+                    ctx.globalAlpha = 0.5; ctx.translate(mouseX, mouseY);
+                    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = isValid ? selectedTowerType.color : '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
+                    ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(selectedTowerType.icon, 0, 0);
+                    ctx.restore();
+                }
+            }
+
+            // 防禦塔
+            for (const t of tdTowers) {
+                const cfg = t.type;
+                ctx.save();
+                ctx.translate(t.x, t.y);
+                ctx.fillStyle = t.isFusion ? '#581c87' : '#1e293b';
+                ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = cfg.color; ctx.lineWidth = t.isFusion ? 4 : 3; ctx.stroke();
+                if (t === fusionSourceTower) {
+                    ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.stroke();
+                }
+                ctx.fillStyle = t.isFusion ? '#22c55e' : '#ffffff';
+                ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(`★×${t.level}`, 0, -29);
+                ctx.rotate(t.angle);
+                ctx.fillStyle = cfg.color;
+                ctx.fillRect(0, -5, t.isFusion ? 28 : 24, 10);
+                ctx.rotate(-t.angle);
+                ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(cfg.icon, 0, 0);
+                ctx.restore();
+            }
+
+            // 攻擊特效
+            for (const fx of activeVisualEffects) {
+                ctx.save();
+                if (fx.type === 'plasma') {
+                    ctx.fillStyle = fx.color;
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 22 + (6 - fx.life) * 2, 0, Math.PI * 2); ctx.fill();
+                } else if (fx.type === 'freeze') {
+                    ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 16 + (6 - fx.life) * 3, 0, Math.PI * 2); ctx.stroke();
+                } else if (fx.type === 'poison') {
+                    ctx.fillStyle = '#84cc16';
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 18, 0, Math.PI * 2); ctx.fill();
+                } else if (fx.type === 'supernova') {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 80, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, (6 - fx.life) * 14, 0, Math.PI * 2); ctx.stroke();
+                } else {
+                    ctx.strokeStyle = fx.color; ctx.lineWidth = 4; ctx.shadowBlur = 12; ctx.shadowColor = fx.color;
+                    ctx.beginPath(); ctx.moveTo(fx.x1, fx.y1); ctx.lineTo(fx.x2, fx.y2); ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 7, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // 提示文字
+            ctx.save();
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (fusionSourceTower) {
+                ctx.fillStyle = 'rgba(88, 28, 135, 0.85)'; ctx.fillRect(140, 8, 400, 30);
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif';
+                ctx.fillText(`請點選要融合的另一座塔，點空白處取消`, 340, 23);
+            } else if (tdMessageLife > 0) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(190, 8, 300, 30);
+                ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 14px sans-serif';
+                ctx.fillText(tdMessage, 340, 23);
+            }
+            if (tdIsPaused && !tdGameOver) {
+                ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = 'bold 28px sans-serif';
+                ctx.fillText('⏸ 已暫停', 340, 120);
+            }
+            if (tdGameOver) {
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.fillRect(0, 0, 680, 480);
+                ctx.fillStyle = '#ef4444'; ctx.font = 'bold 36px sans-serif';
+                ctx.fillText('GAME OVER 遊戲結束', 340, 220);
+                ctx.fillStyle = '#f8fafc'; ctx.font = '18px sans-serif';
+                ctx.fillText(`您撐到了第 ${tdWave} 關`, 340, 270);
+            }
+            ctx.restore();
+        }
+
+        /* ================= 遊戲 3 邏輯（記憶翻牌） ================= */
+        const cardIcons = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼'];
+        let memoryCards = [], flippedCards = [], matchedPairs = 0, moves = 0, memoryLock = false;
+
+        function initMemoryGame() {
+            memoryToken++;
+            memoryLock = false;
+            moves = 0; matchedPairs = 0; flippedCards = [];
+            document.getElementById('card-moves').innerText = moves;
+            document.getElementById('card-pairs').innerText = matchedPairs;
+            document.getElementById('card-msg').innerText = '';
+            memoryCards = [...cardIcons, ...cardIcons];
+            for (let i = memoryCards.length - 1; i > 0; i--) {   // Fisher-Yates 洗牌（原本 sort(random-0.5) 分布不均）
+                const j = Math.floor(Math.random() * (i + 1));
+                [memoryCards[i], memoryCards[j]] = [memoryCards[j], memoryCards[i]];
+            }
+            const board = document.getElementById('memory-board'); board.innerHTML = '';
+            memoryCards.forEach(icon => {
+                const card = document.createElement('div'); card.className = 'memory-card';
+                card.dataset.icon = icon; card.onclick = () => flipCard(card);
+                board.appendChild(card);
+            });
+        }
+
+        function flipCard(card) {
+            if (memoryLock || card.classList.contains('flipped')) return;
+            card.classList.add('flipped'); card.innerText = card.dataset.icon; flippedCards.push(card);
+            if (flippedCards.length < 2) return;
+
+            const [a, b] = flippedCards;
+            flippedCards = [];
+            moves++; document.getElementById('card-moves').innerText = moves;
+            if (a.dataset.icon === b.dataset.icon) {
+                a.classList.add('matched'); b.classList.add('matched');
+                matchedPairs++; document.getElementById('card-pairs').innerText = matchedPairs;
+                if (matchedPairs === 8) document.getElementById('card-msg').innerText = `🎉 恭喜通關！共用了 ${moves} 步`;
+            } else {
+                memoryLock = true;
+                const token = memoryToken;   // 重新洗牌後，舊計時器不會再動到新牌
+                setTimeout(() => {
+                    if (token !== memoryToken) return;
+                    [a, b].forEach(c => { c.classList.remove('flipped'); c.innerText = ''; });
+                    memoryLock = false;
+                }, 800);
+            }
+        }
+    </script>
+</body>
+</html>
