@@ -221,7 +221,7 @@
             padding: 10px;
             z-index: 100;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-            width: 170px;
+            width: 210px;
         }
         #tower-upgrade-menu button {
             background: var(--accent-color);
@@ -279,6 +279,14 @@
         .memory-card.flipped { background: #1e293b; border: 2px solid var(--accent-color); }
         .memory-card.matched { background: #064e3b; border: 2px solid #34d399; cursor: default; }
         #card-msg { margin-top: 15px; font-size: 1.2rem; font-weight: bold; color: #34d399; min-height: 1.5em; }
+
+        #td-recipe { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(2,6,23,0.97); overflow: auto; padding: 14px; box-sizing: border-box; }
+        #td-recipe .recipe-bar { position: sticky; left: 0; top: 0; display: flex; gap: 12px; align-items: center; margin-bottom: 10px; color: #cbd5e1; font-size: 0.9rem; }
+        #recipe-info { min-height: 1.4em; }
+        .recipe-table { border-collapse: collapse; font-size: 0.7rem; color: #e2e8f0; }
+        .recipe-table th { background: #1e293b; padding: 3px 5px; position: sticky; top: 0; font-weight: normal; white-space: nowrap; }
+        .recipe-table td { border: 1px solid #334155; text-align: center; min-width: 34px; padding: 4px 2px; cursor: default; }
+        .recipe-table td:hover { background: #0284c7; color: #fff; }
     </style>
 </head>
 <body>
@@ -383,6 +391,7 @@
             <span style="margin-left: 10px;">金錢: <b id="td-money" style="color:#f59e0b;">500</b></span>
             <span style="margin-left: 10px;">生命: <b id="td-hp" style="color:#ef4444;">10</b></span>
             <button class="ctrl-btn" onclick="initTD()">重來</button>
+            <button class="ctrl-btn" onclick="toggleRecipe()">📖 配方表</button>
         </div>
 
         <div class="td-layout" style="position: relative;">
@@ -403,6 +412,15 @@
                 <div class="shop-title">🛠️ 武器商店</div>
                 <div class="shop-grid" id="tower-shop"></div>
             </div>
+        </div>
+
+        <div id="td-recipe">
+            <div class="recipe-bar">
+                <button class="ctrl-btn" onclick="toggleRecipe()">✕ 關閉</button>
+                <span>橫排是第一座塔 A，直欄是第二座塔 B，格子裡是融合後的編號。滑鼠移上去看詳細。</span>
+            </div>
+            <div class="recipe-bar"><div id="recipe-info">把滑鼠移到任一格子上</div></div>
+            <div id="recipe-table-holder"></div>
         </div>
     </div>
 
@@ -1274,60 +1292,139 @@
             });
         }
 
-        /* ================= 遊戲 2 邏輯：科技塔防 ================= */
-        const TOWER_TYPES = [
-            { id: 1, name: '激光脈衝塔', cost: 50, range: 85, damage: 10, cd: 15, color: '#00f0ff', icon: '⚡', fx: 'laser' },
-            { id: 2, name: '等離子加農砲', cost: 80, range: 110, damage: 30, cd: 25, color: '#ff0055', icon: '💣', fx: 'plasma' },
-            { id: 3, name: '電子風暴塔', cost: 120, range: 100, damage: 18, cd: 20, color: '#38bdf8', icon: '🌩️', fx: 'chain' },
-            { id: 4, name: '零度凍結塔', cost: 100, range: 75, damage: 6, cd: 22, color: '#a5f3fc', icon: '❄️', fx: 'freeze' },
-            { id: 5, name: '高能光子塔', cost: 150, range: 130, damage: 40, cd: 18, color: '#facc15', icon: '🔆', fx: 'laser' },
-            { id: 6, name: '伽瑪射線塔', cost: 200, range: 160, damage: 55, cd: 30, color: '#a855f7', icon: '☢️', fx: 'laser' },
-            { id: 7, name: '反物質發射器', cost: 300, range: 145, damage: 140, cd: 35, color: '#ec4899', icon: '⚛️', fx: 'supernova' },
-            { id: 8, name: '量子震盪塔', cost: 180, range: 90, damage: 35, cd: 20, color: '#10b981', icon: '🌀', fx: 'plasma' },
-            { id: 9, name: '軌道炮打擊站', cost: 400, range: 210, damage: 280, cd: 40, color: '#f97316', icon: '🛰️', fx: 'supernova' },
-            { id: 10, name: '磁暴漩渦塔', cost: 250, range: 105, damage: 45, cd: 22, color: '#8b5cf6', icon: '🧲', fx: 'chain' },
-            { id: 11, name: '毒素噴濺塔', cost: 110, range: 80, damage: 14, cd: 18, color: '#84cc16', icon: '🧪', fx: 'poison' },
-            { id: 12, name: '奈米機械塔', cost: 140, range: 115, damage: 20, cd: 20, color: '#06b6d4', icon: '🤖', fx: 'laser' },
-            { id: 13, name: '超新星核爆塔', cost: 350, range: 150, damage: 180, cd: 38, color: '#ef4444', icon: '💥', fx: 'supernova' },
-            { id: 14, name: '聲波脈衝塔', cost: 130, range: 70, damage: 24, cd: 18, color: '#f43f5e', icon: '🔊', fx: 'plasma' },
-            { id: 15, name: '脈衝電磁塔', cost: 160, range: 100, damage: 16, cd: 22, color: '#6366f1', icon: '📡', fx: 'chain' },
-            { id: 16, name: '能量共振塔', cost: 220, range: 125, damage: 12, cd: 15, color: '#eab308', icon: '✨', fx: 'laser' },
-            { id: 17, name: '駭客干擾塔', cost: 170, range: 120, damage: 25, cd: 25, color: '#14b8a6', icon: '💻', fx: 'freeze' },
-            { id: 18, name: '時空遲滯塔', cost: 280, range: 135, damage: 10, cd: 22, color: '#3b82f6', icon: '⏳', fx: 'freeze' },
-            { id: 19, name: '虛空引力塔', cost: 320, range: 140, damage: 90, cd: 30, color: '#64748b', icon: '🕳️', fx: 'supernova' },
-            { id: 20, name: '泰坦防禦塔', cost: 500, range: 190, damage: 350, cd: 30, color: '#fbbf24', icon: '👑', fx: 'supernova' }
-        ];
+        /* ================= 遊戲 2 邏輯：科技塔防，20 種基礎塔 × 400 種固定融合配方 ================= */
+        const TD_W = 680, TD_H = 480, TD_LANE = 240;
         const TD_MAX_LEVEL = 5, TD_FUSION_COST = 150;
 
-        function getDeterministicFusionResult(id1, id2) {
-            const minId = Math.min(id1, id2), maxId = Math.max(id1, id2);
-            const cantorKey = Math.floor(0.5 * (minId + maxId) * (minId + maxId + 1) + maxId);
-            const names = ["超能星雲主宰", "極寒雷暴樞紐", "時空湮滅之眼", "量子次元裂縫", "泰坦毀滅核心", "暗物質星環", "神聖光子審判", "離子風暴要塞", "虛空碎裂主砲", "終極星際矩陣"];
-            const icons = ["🌌", "❄️⚡", "👁️‍🗨️", "🌀✨", "⚛️🔥", "🪐", "🔆⚔️", "⚡🛡️", "🕳️💥", "💫"];
-            const colors = ["#ff00aa", "#00ffff", "#c084fc", "#9333ea", "#f97316", "#10b981", "#facc15", "#ef4444", "#38bdf8", "#eab308"];
-            const fxList = ["laser", "plasma", "chain", "freeze", "poison", "supernova"];
-            return {
-                name: `【融合】${names[cantorKey % names.length]}`,
-                range: 130 + (cantorKey % 70),
-                damage: 120 + (cantorKey % 250),
-                cd: Math.max(10, 22 - (cantorKey % 10)),
-                color: colors[cantorKey % colors.length],
-                icon: icons[cantorKey % icons.length],
-                fx: fxList[cantorKey % fxList.length]
+        /* ---------- 20 種基礎塔 ---------- */
+        // pre 與 suf 用來組合 400 個不重複的融合塔名稱：前綴取自第一座塔，後綴取自第二座塔
+        const TOWER_TYPES = [
+            { id: 1, name: '激光脈衝塔', pre: '激光', suf: '灼焰', cost: 50, range: 85, damage: 10, cd: 15, color: '#00f0ff', icon: '⚡' },
+            { id: 2, name: '等離子加農砲', pre: '加農', suf: '殉爆', cost: 80, range: 110, damage: 30, cd: 25, color: '#ff0055', icon: '💣' },
+            { id: 3, name: '電子風暴塔', pre: '雷鳴', suf: '麻痺', cost: 120, range: 100, damage: 18, cd: 20, color: '#38bdf8', icon: '🌩️' },
+            { id: 4, name: '零度凍結塔', pre: '極寒', suf: '冰封', cost: 100, range: 75, damage: 6, cd: 22, color: '#a5f3fc', icon: '❄️' },
+            { id: 5, name: '高能光子塔', pre: '光子', suf: '暴擊', cost: 150, range: 130, damage: 40, cd: 18, color: '#facc15', icon: '🔆' },
+            { id: 6, name: '伽瑪射線塔', pre: '伽瑪', suf: '腐蝕', cost: 200, range: 160, damage: 55, cd: 30, color: '#a855f7', icon: '☢️' },
+            { id: 7, name: '反物質發射器', pre: '反物', suf: '處決', cost: 300, range: 145, damage: 140, cd: 35, color: '#ec4899', icon: '⚛️' },
+            { id: 8, name: '量子震盪塔', pre: '量子', suf: '回溯', cost: 180, range: 90, damage: 35, cd: 20, color: '#10b981', icon: '🌀' },
+            { id: 9, name: '軌道炮打擊站', pre: '軌道', suf: '易傷', cost: 400, range: 210, damage: 280, cd: 40, color: '#f97316', icon: '🛰️' },
+            { id: 10, name: '磁暴漩渦塔', pre: '磁暴', suf: '牽引', cost: 250, range: 105, damage: 45, cd: 22, color: '#8b5cf6', icon: '🧲' },
+            { id: 11, name: '毒素噴濺塔', pre: '毒霧', suf: '劇毒', cost: 110, range: 80, damage: 14, cd: 18, color: '#84cc16', icon: '🧪' },
+            { id: 12, name: '奈米機械塔', pre: '奈米', suf: '蔓延', cost: 140, range: 115, damage: 20, cd: 20, color: '#06b6d4', icon: '🤖' },
+            { id: 13, name: '超新星核爆塔', pre: '核爆', suf: '擊退', cost: 350, range: 150, damage: 180, cd: 38, color: '#ef4444', icon: '💥' },
+            { id: 14, name: '聲波脈衝塔', pre: '聲波', suf: '迷亂', cost: 130, range: 70, damage: 24, cd: 18, color: '#f43f5e', icon: '🔊' },
+            { id: 15, name: '脈衝電磁塔', pre: '電磁', suf: '遲滯', cost: 160, range: 100, damage: 16, cd: 22, color: '#6366f1', icon: '📡' },
+            { id: 16, name: '能量共振塔', pre: '共振', suf: '共鳴', cost: 220, range: 125, damage: 12, cd: 15, color: '#eab308', icon: '✨' },
+            { id: 17, name: '駭客干擾塔', pre: '黑客', suf: '石化', cost: 170, range: 120, damage: 25, cd: 25, color: '#14b8a6', icon: '💻' },
+            { id: 18, name: '時空遲滯塔', pre: '時空', suf: '時停', cost: 280, range: 135, damage: 10, cd: 22, color: '#3b82f6', icon: '⏳' },
+            { id: 19, name: '虛空引力塔', pre: '虛空', suf: '吞噬', cost: 320, range: 140, damage: 90, cd: 30, color: '#64748b', icon: '🕳️' },
+            { id: 20, name: '泰坦防禦塔', pre: '泰坦', suf: '超載', cost: 500, range: 190, damage: 350, cd: 30, color: '#fbbf24', icon: '👑' }
+        ];
+
+        /* ---------- 20 種攻擊方式 與 20 種命中效果 ---------- */
+        // dm 為傷害倍率，cm 為冷卻倍率
+        const MODES = [null,
+            { name: '光束', dm: 1.0, cm: 1.0, desc: '瞬間光束命中單一目標' },
+            { name: '炮彈', dm: 1.2, cm: 1.15, desc: '發射炮彈，落點範圍爆炸' },
+            { name: '連鎖閃電', dm: 0.9, cm: 1.0, desc: '閃電連續彈跳 3 次' },
+            { name: '脈衝環', dm: 0.8, cm: 1.1, desc: '以塔為中心擴散衝擊環' },
+            { name: '穿透光線', dm: 1.0, cm: 1.0, desc: '光線貫穿路上所有敵人' },
+            { name: '扇形噴射', dm: 0.9, cm: 1.0, desc: '前方扇形範圍全數命中' },
+            { name: '追蹤飛彈', dm: 0.8, cm: 1.0, desc: '同時發射兩枚追蹤飛彈' },
+            { name: '迴旋鏢', dm: 0.9, cm: 1.05, desc: '飛出再飛回，來回都造成傷害' },
+            { name: '軌道轟炸', dm: 2.2, cm: 1.6, desc: '預告落點，延遲後大範圍轟炸' },
+            { name: '黑洞漩渦', dm: 0.7, cm: 1.4, desc: '製造黑洞，持續拉扯並傷害' },
+            { name: '酸雨', dm: 1.0, cm: 1.5, desc: '降下持續傷害的雨區' },
+            { name: '雙連發', dm: 0.7, cm: 1.0, desc: '短時間內連續命中兩次' },
+            { name: '地裂震波', dm: 1.1, cm: 1.3, desc: '落點引發擴散震波' },
+            { name: '散彈', dm: 0.6, cm: 1.0, desc: '扇形射出三發子彈' },
+            { name: '雷暴', dm: 0.7, cm: 1.2, desc: '天降落雷劈向三個敵人' },
+            { name: '環繞衛星', dm: 1.0, cm: 1.0, desc: '三顆衛星環繞，碰到敵人就傷害' },
+            { name: '分裂彈', dm: 1.0, cm: 1.1, desc: '命中後裂成四枚碎片' },
+            { name: '彈射球', dm: 0.9, cm: 1.1, desc: '在敵人之間彈跳四次' },
+            { name: '狙擊', dm: 2.3, cm: 1.8, desc: '鎖定血量最高的敵人' },
+            { name: '地雷', dm: 1.6, cm: 1.8, desc: '在路上佈雷，敵人靠近就引爆' }
+        ];
+        const EFFECTS = [null,
+            { name: '灼燒', glyph: '🔥', color: '#f97316', desc: '持續灼燒掉血' },
+            { name: '殉爆', glyph: '💥', color: '#ef4444', desc: '被擊殺時爆炸，波及周圍' },
+            { name: '麻痺', glyph: '⭐', color: '#fde047', desc: '短暫定身' },
+            { name: '冰凍', glyph: '❄️', color: '#a5f3fc', desc: '完全凍結一小段時間' },
+            { name: '暴擊', glyph: '💢', color: '#fb7185', desc: '機率造成額外暴擊傷害' },
+            { name: '腐蝕', glyph: '🧫', color: '#a3e635', desc: '額外扣除目標最大血量的百分比' },
+            { name: '處決', glyph: '☠️', color: '#e5e7eb', desc: '目標血量低時傷害大增' },
+            { name: '回溯', glyph: '⏪', color: '#34d399', desc: '機率把敵人傳回起點方向' },
+            { name: '易傷', glyph: '🎯', color: '#f472b6', desc: '目標受到的傷害增加' },
+            { name: '牽引', glyph: '🧲', color: '#a78bfa', desc: '把敵人拉向防禦塔' },
+            { name: '中毒', glyph: '🧪', color: '#84cc16', desc: '毒素可疊加，持續掉血' },
+            { name: '傳染', glyph: '🦠', color: '#22d3ee', desc: '把毒素傳給周圍敵人' },
+            { name: '擊退', glyph: '💨', color: '#f87171', desc: '把敵人往後推' },
+            { name: '迷亂', glyph: '💫', color: '#fb923c', desc: '敵人暫時倒著走' },
+            { name: '減速', glyph: '🐌', color: '#818cf8', desc: '敵人移動速度減半' },
+            { name: '共振', glyph: '〰️', color: '#facc15', desc: '連續命中同一目標，傷害逐次增加' },
+            { name: '石化', glyph: '🗿', color: '#2dd4bf', desc: '機率長時間石化，其餘則減速' },
+            { name: '時停', glyph: '⌛', color: '#60a5fa', desc: '命中處周圍的敵人暫停行動' },
+            { name: '吞噬', glyph: '👁️', color: '#94a3b8', desc: '擊殺敵人後，永久提升自身傷害' },
+            { name: '超載', glyph: '⚙️', color: '#fcd34d', desc: '每第 5 次命中造成三倍傷害' }
+        ];
+
+        // 基礎塔的攻擊方式與效果依編號對應
+        TOWER_TYPES.forEach(t => { t.mode = t.id; t.eff = t.id; t.color2 = t.color; t.icon2 = t.icon; t.shape = t.id; t.ring = 0; t.fused = false; });
+
+        /* ---------- 400 種固定融合配方 ---------- */
+        // 配方 A+B 的順序有差別：攻擊方式取自 A，命中效果取自 B，所以 1+2 與 2+1 是不同的塔
+        function mulberry32(a) {
+            return function () {
+                a |= 0; a = a + 0x6D2B79F5 | 0;
+                let t = Math.imul(a ^ a >>> 15, 1 | a);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
             };
         }
+        // 固定種子洗牌，編號 21 到 420 每個配方各取一個，永遠不會重複
+        const FUSION_ID = (() => {
+            const forced = { 0: 47, 1: 42, 2: 43 };   // 1+1=47、1+2=42、1+3=43
+            const rnd = mulberry32(20241103);
+            const pool = [];
+            for (let i = 21; i <= 420; i++) if (i !== 47 && i !== 42 && i !== 43) pool.push(i);
+            for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+            const out = []; let p = 0;
+            for (let i = 0; i < 400; i++) out.push(forced[i] !== undefined ? forced[i] : pool[p++]);
+            return out;
+        })();
 
+        const fusionCache = {};
+        function getFusion(a, b) {
+            const key = a * 100 + b;
+            if (fusionCache[key]) return fusionCache[key];
+            const A = TOWER_TYPES[a - 1], B = TOWER_TYPES[b - 1];
+            const h = (a * 7 + b * 13) % 11;
+            const def = {
+                id: FUSION_ID[(a - 1) * 20 + (b - 1)], a, b, fused: true,
+                name: `${A.pre}${B.suf}塔`,
+                mode: a, eff: b,
+                range: Math.min(260, Math.max(A.range, B.range) + 15),
+                damage: Math.round(((A.damage + B.damage) * 1.4 + 70) * (0.92 + h / 60)),
+                cd: Math.max(10, Math.round(Math.min(A.cd, B.cd) * 0.9)),
+                color: A.color, color2: B.color, icon: A.icon, icon2: B.icon,
+                shape: a, ring: b, cost: A.cost + B.cost + TD_FUSION_COST
+            };
+            fusionCache[key] = def;
+            return def;
+        }
+
+        /* ---------- 狀態 ---------- */
         let selectedTowerType = TOWER_TYPES[0];
         let tdCanvas, tdCtx, tdLoop = null;
         let tdIsPaused = false, tdSpeed = 1, tdMoney = 500, tdHP = 10;
         let tdWave = 1, waveEnemiesSpawned = 0, waveEnemiesTotal = 8, waveClearCooldown = 0, spawnTimer = 0;
         let tdTowers = [], tdEnemies = [], tdGameOver = false;
+        let tdProj = [], tdZones = [], tdMines = [], tdStrikes = [], tdLater = [], tdVfx = [], tdParts = [];
         let selectedPlacedTower = null, fusionSourceTower = null;
         let mouseX = -1, mouseY = -1, isHoveringCanvas = false;
-        let activeVisualEffects = [];
-        let tdMessage = '', tdMessageLife = 0;
+        let tdMessage = '', tdMessageLife = 0, tdFrame = 0, tdUid = 1;
 
-        function tdNotify(t) { tdMessage = t; tdMessageLife = 60; }
+        function tdNotify(t) { tdMessage = t; tdMessageLife = 70; }
         function updateTDHud() {
             document.getElementById('td-money').innerText = tdMoney;
             document.getElementById('td-hp').innerText = tdHP;
@@ -1337,6 +1434,18 @@
             const r = tdCanvas.getBoundingClientRect();
             return { x: (e.clientX - r.left) * tdCanvas.width / r.width, y: (e.clientY - r.top) * tdCanvas.height / r.height };
         }
+        function towerAt(x, y) { return tdTowers.find(t => Math.hypot(t.x - x, t.y - y) < 25); }
+        function towerLabel(def) { return `#${def.id} ${def.name}`; }
+
+        function placeTower(def, x, y) {
+            const t = {
+                uid: tdUid++, x, y, type: def, level: 1, mode: def.mode, eff: def.eff,
+                damage: def.damage, range: def.range, cdMax: def.cd, cd: 0, angle: 0,
+                totalInvested: def.cost, isFusion: def.fused, bonus: 0, hits: 0, orbAng: Math.random() * 6.28
+            };
+            tdTowers.push(t);
+            return t;
+        }
 
         function initTD() {
             tdCanvas = document.getElementById('td-canvas');
@@ -1344,11 +1453,13 @@
             tdMoney = 500; tdHP = 10; tdWave = 1;
             waveEnemiesSpawned = 0; waveEnemiesTotal = 8; waveClearCooldown = 0; spawnTimer = 0;
             tdTowers = []; tdEnemies = []; tdGameOver = false;
+            tdProj = []; tdZones = []; tdMines = []; tdStrikes = []; tdLater = []; tdVfx = []; tdParts = [];
             tdIsPaused = false; document.getElementById('td-pause-btn').innerText = '暫停';
             tdSpeed = parseInt(document.getElementById('td-speed').value) || 1;
             selectedPlacedTower = null; fusionSourceTower = null;
-            activeVisualEffects = []; tdMessage = ''; tdMessageLife = 0;
+            tdMessage = ''; tdMessageLife = 0;
             document.getElementById('tower-upgrade-menu').style.display = 'none';
+            document.getElementById('td-recipe').style.display = 'none';
             updateTDHud();
             renderTowerShop();
 
@@ -1359,10 +1470,13 @@
             tdCanvas.onclick = (e) => {
                 if (tdGameOver) return;
                 const { x, y } = tdCanvasPos(e);
-                const clickedTower = tdTowers.find(t => Math.hypot(t.x - x, t.y - y) < 25);
+                const clickedTower = towerAt(x, y);
 
                 if (fusionSourceTower) {
-                    if (clickedTower && clickedTower !== fusionSourceTower) executeManualFusion(fusionSourceTower, clickedTower);
+                    if (clickedTower && clickedTower !== fusionSourceTower) {
+                        if (clickedTower.isFusion) { tdNotify('融合塔不能再當素材'); return; }
+                        executeManualFusion(fusionSourceTower, clickedTower);
+                    }
                     fusionSourceTower = null;
                     return;
                 }
@@ -1376,12 +1490,7 @@
                 if (y > 200 && y < 280) { tdNotify('這裡是敵人路徑，不能建塔'); return; }
                 if (tdTowers.some(t => Math.hypot(t.x - x, t.y - y) < 50)) { tdNotify('離其他塔太近了'); return; }
                 if (tdMoney < selectedTowerType.cost) { tdNotify('金錢不足'); return; }
-
-                tdTowers.push({
-                    x, y, type: selectedTowerType, level: 1,
-                    damage: selectedTowerType.damage, range: selectedTowerType.range,
-                    cd: 0, angle: 0, totalInvested: selectedTowerType.cost, isFusion: false
-                });
+                placeTower(selectedTowerType, x, y);
                 tdMoney -= selectedTowerType.cost;
                 updateTDHud();
             };
@@ -1390,6 +1499,7 @@
             tdLoop = setInterval(tdTick, 1000 / 30);
         }
 
+        /* ---------- 選單、升級、融合、賣出 ---------- */
         function showUpgradeMenu(tower) {
             const menu = document.getElementById('tower-upgrade-menu');
             const layout = menu.parentElement;
@@ -1397,9 +1507,10 @@
             const sx = cr.width / tdCanvas.width, sy = cr.height / tdCanvas.height;
             const offX = cr.left - lr.left, offY = cr.top - lr.top;
             let left = offX + tower.x * sx + 32;
-            if (left + 190 > offX + cr.width) left = offX + tower.x * sx - 32 - 190;
-            let top = offY + tower.y * sy - 70;
+            if (left + 230 > offX + cr.width) left = offX + tower.x * sx - 32 - 230;
+            let top = offY + tower.y * sy - 90;
             if (top < offY) top = offY;
+            if (top + 230 > offY + cr.height) top = offY + cr.height - 230;
             menu.style.left = left + 'px';
             menu.style.top = top + 'px';
             menu.style.display = 'block';
@@ -1410,12 +1521,18 @@
         function tdSellPrice(t) { return Math.floor(t.totalInvested * 0.7); }
 
         function updateUpgradeMenuStats(tower) {
-            const tierName = tower.isFusion ? '【融合進階】' : '等級: ';
-            document.getElementById('menu-tower-title').innerText = tower.type.name;
-            document.getElementById('menu-tower-stats').innerText = `${tierName}${tower.level} | 傷害: ${tower.damage} | 範圍: ${tower.range}`;
+            document.getElementById('menu-tower-title').innerText = towerLabel(tower.type);
+            const bonus = tower.bonus > 0 ? ` +${Math.round(tower.bonus * 100)}%` : '';
+            document.getElementById('menu-tower-stats').innerHTML =
+                `等級 ${tower.level}｜傷害 ${Math.round(tower.damage * (1 + tower.bonus))}${bonus}｜範圍 ${tower.range}<br>` +
+                `<span style="color:${tower.type.color}">攻擊：${MODES[tower.mode].name}</span>　${MODES[tower.mode].desc}<br>` +
+                `<span style="color:${EFFECTS[tower.eff].color}">效果：${EFFECTS[tower.eff].name}</span>　${EFFECTS[tower.eff].desc}`;
             const upBtn = document.getElementById('menu-upgrade-btn');
             if (tower.level >= TD_MAX_LEVEL) { upBtn.innerText = '已達最高等級'; upBtn.disabled = true; }
             else { upBtn.innerText = `升級 $${tdUpgradeCost(tower)}`; upBtn.disabled = false; }
+            const fuBtn = document.getElementById('menu-fusion-btn');
+            if (tower.isFusion) { fuBtn.innerText = '融合塔不能再融合'; fuBtn.disabled = true; }
+            else { fuBtn.innerText = `選擇融合素材 $${TD_FUSION_COST}`; fuBtn.disabled = false; }
             document.getElementById('menu-sell-btn').innerText = `賣出 +$${tdSellPrice(tower)}`;
         }
 
@@ -1432,7 +1549,7 @@
             if (tdMoney < cost) { tdNotify('金錢不足，無法升級'); return; }
             tdMoney -= cost;
             t.level++;
-            t.damage = Math.floor(t.damage * 1.35);   // 傷害只在這裡成長一次（原本攻擊時又乘一次，造成重複加成）
+            t.damage = Math.floor(t.damage * 1.35);
             t.range += 12;
             t.totalInvested += cost;
             updateTDHud();
@@ -1440,38 +1557,41 @@
         }
 
         function startManualFusion() {
-            if (!selectedPlacedTower) return;
+            const t = selectedPlacedTower;
+            if (!t || t.isFusion) return;
             if (tdMoney < TD_FUSION_COST) { tdNotify(`融合需要 $${TD_FUSION_COST}，金錢不足`); return; }
-            if (tdTowers.length < 2) { tdNotify('至少要有兩座塔才能融合'); return; }
-            fusionSourceTower = selectedPlacedTower;
+            if (tdTowers.filter(x => !x.isFusion).length < 2) { tdNotify('至少要有兩座基礎塔才能融合'); return; }
+            fusionSourceTower = t;
             document.getElementById('tower-upgrade-menu').style.display = 'none';
         }
 
-        function executeManualFusion(t1, t2) {
+        // 融合：第一座塔 A 提供攻擊方式，第二座塔 B 提供命中效果，結果留在 A 的位置
+        function executeManualFusion(src, dst) {
+            if (src.isFusion || dst.isFusion) return;
             if (tdMoney < TD_FUSION_COST) { tdNotify('金錢不足，融合取消'); return; }
             tdMoney -= TD_FUSION_COST;
-            const id1 = t1.type.id || 1, id2 = t2.type.id || 1;
-            const res = getDeterministicFusionResult(id1, id2);
-            t1.type = {
-                id: Math.min(id1, id2) * 100 + Math.max(id1, id2),
-                name: res.name, cost: 500, icon: res.icon, color: res.color, fx: res.fx,
-                cd: res.cd           // 原本漏掉 cd，融合塔永遠只吃預設值
-            };
-            t1.damage = res.damage;
-            t1.range = res.range;
-            t1.level = 1;
-            t1.cd = 0;
-            t1.totalInvested += t2.totalInvested + TD_FUSION_COST;
-            t1.isFusion = true;
-            tdTowers = tdTowers.filter(t => t !== t2);
+            const def = getFusion(src.type.id, dst.type.id);
+            const invested = src.totalInvested + dst.totalInvested + TD_FUSION_COST;
+            tdTowers = tdTowers.filter(t => t !== src && t !== dst);
+            const nt = placeTower(def, src.x, src.y);
+            nt.totalInvested = invested;
+            tdProj = tdProj.filter(p => p.t !== src && p.t !== dst);
+            tdMines = tdMines.filter(m => m.t !== src && m.t !== dst);
+            tdZones = tdZones.filter(z => z.t !== src && z.t !== dst);
+            addVfx({ k: 'boom', x: nt.x, y: nt.y, r: 55, life: 18, c1: def.color, c2: def.color2 });
+            tdNotify(`融合成功：${towerLabel(def)}`);
             updateTDHud();
             closeUpgradeMenu();
         }
 
         function sellSelectedTower() {
-            if (!selectedPlacedTower) return;
-            tdMoney += tdSellPrice(selectedPlacedTower);
-            tdTowers = tdTowers.filter(t => t !== selectedPlacedTower);
+            const t = selectedPlacedTower;
+            if (!t) return;
+            tdMoney += tdSellPrice(t);
+            tdTowers = tdTowers.filter(x => x !== t);
+            tdProj = tdProj.filter(p => p.t !== t);
+            tdMines = tdMines.filter(m => m.t !== t);
+            tdZones = tdZones.filter(z => z.t !== t);
             updateTDHud();
             closeUpgradeMenu();
         }
@@ -1482,10 +1602,11 @@
             TOWER_TYPES.forEach(t => {
                 const card = document.createElement('div');
                 card.className = `tower-card ${selectedTowerType.id === t.id ? 'selected' : ''}`;
+                card.title = `攻擊：${MODES[t.mode].name}　效果：${EFFECTS[t.eff].name}`;
                 card.innerHTML = `
                     <div class="tower-icon">${t.icon}</div>
                     <div class="tower-info">
-                        <div class="tower-name">${t.name}</div>
+                        <div class="tower-name">#${t.id} ${t.name}</div>
                         <div class="tower-cost">$${t.cost}</div>
                     </div>`;
                 card.onclick = () => { selectedTowerType = t; renderTowerShop(); };
@@ -1497,25 +1618,474 @@
             tdIsPaused = !tdIsPaused;
             document.getElementById('td-pause-btn').innerText = tdIsPaused ? '繼續' : '暫停';
         }
-        function changeTDSpeed(val) { tdSpeed = parseInt(val) || 1; }   // 改成每個 tick 跑多次邏輯，不再重建計時器
+        function changeTDSpeed(val) { tdSpeed = parseInt(val) || 1; }
         function stopTD() { if (tdLoop) { clearInterval(tdLoop); tdLoop = null; } }
 
-        function tdTick() {
-            if (!tdIsPaused && !tdGameOver) for (let i = 0; i < tdSpeed; i++) { stepTD(); if (tdGameOver) break; }
-            if (tdMessageLife > 0) tdMessageLife--;
-            drawTD();   // 暫停時也持續重繪，建塔預覽/選單不會凍結
+        /* ---------- 配方表 ---------- */
+        let recipeBuilt = false;
+        function toggleRecipe() {
+            const box = document.getElementById('td-recipe');
+            if (box.style.display === 'block') { box.style.display = 'none'; return; }
+            if (!recipeBuilt) buildRecipeTable();
+            box.style.display = 'block';
+        }
+        function buildRecipeTable() {
+            recipeBuilt = true;
+            let html = '<table class="recipe-table"><tr><th>A＼B</th>';
+            TOWER_TYPES.forEach(t => { html += `<th title="${t.name}">${t.icon}<br>${t.id}</th>`; });
+            html += '</tr>';
+            for (const A of TOWER_TYPES) {
+                html += `<tr><th title="${A.name}">${A.icon} ${A.id}</th>`;
+                for (const B of TOWER_TYPES) html += `<td data-a="${A.id}" data-b="${B.id}">${FUSION_ID[(A.id - 1) * 20 + (B.id - 1)]}</td>`;
+                html += '</tr>';
+            }
+            html += '</table>';
+            const holder = document.getElementById('recipe-table-holder');
+            holder.innerHTML = html;
+            holder.onmouseover = (e) => {
+                const td = e.target.closest('td');
+                if (!td) return;
+                const a = +td.dataset.a, b = +td.dataset.b, d = getFusion(a, b);
+                document.getElementById('recipe-info').innerHTML =
+                    `${TOWER_TYPES[a - 1].icon} #${a} ${TOWER_TYPES[a - 1].name} ＋ ${TOWER_TYPES[b - 1].icon} #${b} ${TOWER_TYPES[b - 1].name} ＝ <b style="color:#fbbf24">#${d.id} ${d.name}</b>` +
+                    `　攻擊：${MODES[d.mode].name}　效果：${EFFECTS[d.eff].name}　傷害 ${d.damage}　範圍 ${d.range}`;
+            };
+        }
+
+        /* ================= 戰鬥邏輯 ================= */
+        function towerDmg(t) { return t.damage * (1 + t.bonus); }
+
+        function addVfx(v) { if (tdVfx.length < 220) tdVfx.push(Object.assign({ max: v.life }, v)); }
+        function addVfxT(t, v) { addVfx(Object.assign({ c1: t.type.color, c2: t.type.color2 }, v)); }
+
+        // 命中時依「效果」噴出不同的符號粒子
+        function hitFx(t, e) {
+            if (tdParts.length > 180) return;
+            const ef = EFFECTS[t.eff];
+            for (let i = 0; i < 2; i++) {
+                tdParts.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 3, vy: -1 - Math.random() * 1.5, life: 20, max: 20, glyph: ef.glyph });
+            }
+            addVfx({ k: 'spark', x: e.x, y: e.y, r: 16, life: 8, c1: ef.color, c2: t.type.color });
+        }
+
+        function hurt(e, dmg, t) {
+            if (e.hp <= 0) return;
+            if (e.vuln > 0) dmg *= 1.3;
+            e.hp -= dmg;
+            if (t) e.last = t;
+        }
+
+        function strike(t, e, dmg) {
+            if (!e || e.hp <= 0) return;
+            e.lastDmg = dmg;
+            hurt(e, dmg, t);
+            applyEffect(t, e, dmg);
+            hitFx(t, e);
+        }
+
+        function applyEffect(t, e, dmg) {
+            switch (t.eff) {
+                case 1: e.burn = 70; e.burnD = Math.max(e.burnD, dmg * 0.014); break;
+                case 3: if (e.stunImm <= 0) { e.stun = 22; e.stunImm = 110; } break;
+                case 4: if (e.freezeImm <= 0) { e.freeze = 36; e.freezeImm = 130; } break;
+                case 5: if (Math.random() < 0.3) hurt(e, dmg * 1.2, t); break;
+                case 6: hurt(e, e.maxHp * 0.025, t); break;
+                case 7: if (e.hp < e.maxHp * 0.3) hurt(e, dmg * 1.5, t); break;
+                case 8: if (Math.random() < 0.3) e.x = Math.max(0, e.x - 70); break;
+                case 9: e.vuln = 100; break;
+                case 10: e.x += (t.x > e.x ? 1 : -1) * Math.min(14, Math.abs(t.x - e.x)); break;
+                case 11: poison(e, dmg); break;
+                case 12:
+                    for (const o of tdEnemies) if (o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= 70) poison(o, dmg);
+                    break;
+                case 13: e.x = Math.max(0, e.x - 16); break;
+                case 14: e.confuse = 55; break;
+                case 15: e.slow = 80; break;
+                case 16: e.reson = Math.min(5, e.reson + 1); e.resonT = 100; hurt(e, dmg * 0.12 * e.reson, t); break;
+                case 17:
+                    if (Math.random() < 0.12 && e.stunImm <= 0) { e.stun = 60; e.stunImm = 200; } else e.slow = 40;
+                    break;
+                case 18:
+                    for (const o of tdEnemies) if (o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= 85 && o.freezeImm <= 0) { o.freeze = 16; o.freezeImm = 110; }
+                    addVfx({ k: 'ringfx', x: e.x, y: e.y, r: 85, life: 10, c1: '#60a5fa', c2: '#bfdbfe' });
+                    break;
+                case 20:
+                    t.hits++;
+                    if (t.hits % 5 === 0) { hurt(e, dmg * 2, t); addVfx({ k: 'boom', x: e.x, y: e.y, r: 30, life: 10, c1: '#fcd34d', c2: '#ffffff' }); }
+                    break;
+            }
+        }
+        function poison(e, dmg) { e.poison = 100; e.pst = Math.min(5, e.pst + 1); e.poisonD = Math.max(e.poisonD, dmg * 0.007); }
+
+        function enemiesInRange(x, y, r) { return tdEnemies.filter(e => e.hp > 0 && Math.hypot(e.x - x, e.y - y) <= r); }
+        function nearestEnemy(x, y, r, skip) {
+            let best = null, bd = r;
+            for (const e of tdEnemies) {
+                if (e.hp <= 0 || (skip && skip.has(e))) continue;
+                const d = Math.hypot(e.x - x, e.y - y);
+                if (d <= bd) { bd = d; best = e; }
+            }
+            return best;
+        }
+
+        function pickTarget(t) {
+            let target = null;
+            for (const e of tdEnemies) {
+                if (e.hp <= 0 || Math.hypot(e.x - t.x, e.y - t.y) > t.range) continue;
+                if (t.mode === 19) { if (!target || e.hp > target.hp) target = e; }
+                else if (!target || e.x > target.x) target = e;
+            }
+            return target;
+        }
+
+        /* ---------- 20 種攻擊方式 ---------- */
+        function fire(t, target) {
+            const d = towerDmg(t) * MODES[t.mode].dm;
+            const ang = Math.atan2(target.y - t.y, target.x - t.x);
+            t.angle = ang;
+            switch (t.mode) {
+                case 1:
+                    strike(t, target, d);
+                    addVfxT(t, { k: 'beam', x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 8 });
+                    break;
+                case 2:
+                    tdProj.push({ kind: 'shell', x: t.x, y: t.y, target, tx: target.x, ty: target.y, speed: 9, dmg: d, t, life: 120 });
+                    break;
+                case 3: {
+                    const hit = new Set([target]);
+                    let cur = target; const pts = [{ x: t.x, y: t.y }, { x: cur.x, y: cur.y }];
+                    strike(t, cur, d);
+                    for (let j = 1; j <= 3; j++) {
+                        const nx = nearestEnemy(cur.x, cur.y, 95, hit);
+                        if (!nx) break;
+                        hit.add(nx); strike(t, nx, d * Math.pow(0.7, j)); pts.push({ x: nx.x, y: nx.y }); cur = nx;
+                    }
+                    addVfxT(t, { k: 'lightning', pts, life: 9 });
+                    break;
+                }
+                case 4:
+                    tdZones.push({ kind: 'ring', style: 'pulse', x: t.x, y: t.y, r: t.range, life: 14, max: 14, dmg: d, t, hit: new Set() });
+                    break;
+                case 5: {
+                    const L = t.range * 1.5, ex = t.x + Math.cos(ang) * L, ey = t.y + Math.sin(ang) * L;
+                    const list = tdEnemies.filter(e => e.hp > 0 && distToSeg(e.x, e.y, t.x, t.y, ex, ey) < 15)
+                        .sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y));
+                    list.forEach((e, i) => strike(t, e, d * Math.pow(0.9, i)));
+                    addVfxT(t, { k: 'bolt', x1: t.x, y1: t.y, x2: ex, y2: ey, life: 10 });
+                    break;
+                }
+                case 6: {
+                    for (const e of enemiesInRange(t.x, t.y, t.range)) {
+                        let da = Math.atan2(e.y - t.y, e.x - t.x) - ang;
+                        while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+                        if (Math.abs(da) < 0.55) strike(t, e, d);
+                    }
+                    addVfxT(t, { k: 'wedge', x: t.x, y: t.y, ang, r: t.range, life: 10 });
+                    break;
+                }
+                case 7: {
+                    const second = nearestEnemy(t.x, t.y, t.range, new Set([target])) || target;
+                    [target, second].forEach((tg, i) => tdProj.push({
+                        kind: 'missile', x: t.x, y: t.y, target: tg, tx: tg.x, ty: tg.y, speed: 6.5,
+                        dmg: d, t, life: 110, ang: ang + (i ? 0.9 : -0.9)
+                    }));
+                    break;
+                }
+                case 8: {
+                    const dist = Math.min(Math.hypot(target.x - t.x, target.y - t.y) + 40, t.range * 1.2);
+                    tdProj.push({
+                        kind: 'boom', x: t.x, y: t.y, tx: t.x + Math.cos(ang) * dist, ty: t.y + Math.sin(ang) * dist,
+                        phase: 0, speed: 8, dmg: d, t, hit: new Set(), spin: 0, life: 200
+                    });
+                    break;
+                }
+                case 9: {
+                    const sx = Math.min(TD_W - 10, target.x + target.speed * 18);
+                    tdStrikes.push({ x: sx, y: target.y, delay: 18, max: 18, r: 55, dmg: d, t });
+                    break;
+                }
+                case 10:
+                    tdZones.push({ kind: 'vortex', x: target.x, y: target.y, r: 70, life: 70, max: 70, dmg: d * 0.35, t, hit: new Set(), tick: 0 });
+                    break;
+                case 11:
+                    tdZones.push({ kind: 'rain', x: target.x, y: target.y, r: 58, life: 80, max: 80, dmg: d * 0.35, t, hit: new Set(), tick: 0 });
+                    break;
+                case 12:
+                    strike(t, target, d);
+                    addVfxT(t, { k: 'twin', x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 8 });
+                    tdLater.push({ delay: 6, fn: () => {
+                        if (target.hp > 0) {
+                            strike(t, target, d);
+                            addVfxT(t, { k: 'twin', x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 8 });
+                        }
+                    } });
+                    break;
+                case 13:
+                    tdZones.push({ kind: 'ring', style: 'quake', x: target.x, y: target.y, r: 95, life: 20, max: 20, dmg: d, t, hit: new Set() });
+                    break;
+                case 14:
+                    for (const da of [-0.28, 0, 0.28]) {
+                        tdProj.push({ kind: 'bullet', x: t.x, y: t.y, vx: Math.cos(ang + da) * 10, vy: Math.sin(ang + da) * 10, dmg: d, t, life: Math.ceil(t.range * 1.25 / 10) });
+                    }
+                    break;
+                case 15: {
+                    const pool = enemiesInRange(t.x, t.y, t.range).filter(e => e !== target).sort(() => Math.random() - 0.5);
+                    [target, ...pool].slice(0, 3).forEach(e => {
+                        strike(t, e, d);
+                        const pts = [];
+                        for (let k = 0; k <= 6; k++) pts.push({ x: e.x + (k === 6 ? 0 : (Math.random() - 0.5) * 26), y: (e.y * k) / 6 });
+                        addVfxT(t, { k: 'lightning', pts, life: 9, sky: true });
+                    });
+                    break;
+                }
+                case 17:
+                    tdProj.push({ kind: 'split', x: t.x, y: t.y, target, tx: target.x, ty: target.y, speed: 9, dmg: d, t, life: 110 });
+                    break;
+                case 18:
+                    tdProj.push({ kind: 'ric', x: t.x, y: t.y, target, tx: target.x, ty: target.y, speed: 11, dmg: d, t, life: 160, bounces: 4, hit: new Set([target]) });
+                    break;
+                case 19:
+                    strike(t, target, d);
+                    addVfxT(t, { k: 'snipe', x1: t.x, y1: t.y, x2: target.x, y2: target.y, life: 12 });
+                    addVfx({ k: 'ringfx', x: t.x, y: t.y, r: 26, life: 8, c1: t.type.color, c2: '#ffffff' });
+                    break;
+                case 20: {
+                    if (tdMines.filter(m => m.t === t).length >= 5) return false;
+                    let mx = target.x + 22;
+                    if (Math.hypot(mx - t.x, target.y - t.y) > t.range) mx = target.x;
+                    tdMines.push({ x: mx, y: target.y, t, dmg: d, life: 700, born: tdFrame });
+                    addVfxT(t, { k: 'ringfx', x: mx, y: target.y, r: 18, life: 8 });
+                    break;
+                }
+            }
+            return true;
+        }
+
+        function distToSeg(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+            let u = l2 ? ((px - x1) * dx + (py - y1) * dy) / l2 : 0;
+            u = Math.max(0, Math.min(1, u));
+            return Math.hypot(px - (x1 + u * dx), py - (y1 + u * dy));
+        }
+
+        /* ---------- 子彈 / 區域 / 地雷 / 延遲轟炸 ---------- */
+        function projImpact(p) {
+            const t = p.t, tg = p.target;
+            switch (p.kind) {
+                case 'shell': {
+                    for (const e of enemiesInRange(p.x, p.y, 48)) strike(t, e, e === tg ? p.dmg : p.dmg * 0.7);
+                    addVfxT(t, { k: 'boom', x: p.x, y: p.y, r: 48, life: 12 });
+                    return true;
+                }
+                case 'missile':
+                    if (tg && tg.hp > 0) strike(t, tg, p.dmg);
+                    addVfxT(t, { k: 'boom', x: p.x, y: p.y, r: 20, life: 8 });
+                    return true;
+                case 'split': {
+                    if (tg && tg.hp > 0) strike(t, tg, p.dmg);
+                    const base = Math.random() * 6.28;
+                    for (let i = 0; i < 4; i++) {
+                        const a = base + i * Math.PI / 2;
+                        tdProj.push({ kind: 'frag', x: p.x, y: p.y, vx: Math.cos(a) * 6, vy: Math.sin(a) * 6, dmg: p.dmg * 0.45, t, life: 12 });
+                    }
+                    addVfxT(t, { k: 'boom', x: p.x, y: p.y, r: 24, life: 8 });
+                    return true;
+                }
+                case 'ric': {
+                    if (tg && tg.hp > 0) strike(t, tg, p.dmg);
+                    if (p.bounces > 0) {
+                        const pool = tdEnemies.filter(e => e.hp > 0 && !p.hit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < 120);
+                        if (pool.length) {
+                            const nx = pool[Math.floor(Math.random() * pool.length)];
+                            p.hit.add(nx); p.target = nx; p.tx = nx.x; p.ty = nx.y; p.bounces--; p.dmg *= 0.85;
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            }
+            return true;
+        }
+
+        function stepProjectiles() {
+            for (let i = tdProj.length - 1; i >= 0; i--) {
+                const p = tdProj[i];
+                p.life--;
+                let remove = p.life <= 0;
+                if (!remove) {
+                    if (p.kind === 'bullet' || p.kind === 'frag') {
+                        p.x += p.vx; p.y += p.vy;
+                        const hitE = tdEnemies.find(e => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 13);
+                        if (hitE) { strike(p.t, hitE, p.dmg); remove = true; }
+                    } else if (p.kind === 'boom') {
+                        p.spin += 0.5;
+                        const gx = p.phase === 0 ? p.tx : p.t.x, gy = p.phase === 0 ? p.ty : p.t.y;
+                        const dx = gx - p.x, dy = gy - p.y, dist = Math.hypot(dx, dy);
+                        if (dist <= p.speed) {
+                            p.x = gx; p.y = gy;
+                            if (p.phase === 0) { p.phase = 1; p.hit.clear(); } else remove = true;
+                        } else { p.x += dx / dist * p.speed; p.y += dy / dist * p.speed; }
+                        for (const e of tdEnemies) {
+                            if (e.hp > 0 && !p.hit.has(e) && Math.hypot(e.x - p.x, e.y - p.y) < 17) { p.hit.add(e); strike(p.t, e, p.dmg); }
+                        }
+                    } else {
+                        if (p.target && p.target.hp > 0) { p.tx = p.target.x; p.ty = p.target.y; }
+                        else if (p.kind === 'missile' || p.kind === 'split' || p.kind === 'ric') {
+                            if (p.kind === 'ric') { remove = true; }
+                            else { const n = nearestEnemy(p.x, p.y, 160); if (n) { p.target = n; p.tx = n.x; p.ty = n.y; } else if (p.kind !== 'shell') remove = true; }
+                        }
+                        const dx = p.tx - p.x, dy = p.ty - p.y, dist = Math.hypot(dx, dy);
+                        if (!remove) {
+                            if (dist <= p.speed + 6) { if (projImpact(p)) remove = true; }
+                            else {
+                                p.x += dx / dist * p.speed; p.y += dy / dist * p.speed; p.ang = Math.atan2(dy, dx);
+                                if (p.kind === 'missile' && tdFrame % 2 === 0) addVfx({ k: 'trail', x: p.x, y: p.y, r: 4, life: 10, c1: p.t.type.color, c2: p.t.type.color2 });
+                            }
+                        }
+                    }
+                }
+                if (remove) tdProj.splice(i, 1);
+            }
+        }
+
+        function stepZones() {
+            for (let i = tdZones.length - 1; i >= 0; i--) {
+                const z = tdZones[i];
+                z.life--;
+                const prog = 1 - z.life / z.max;
+                if (z.kind === 'ring') {
+                    const cur = z.r * prog;
+                    for (const e of tdEnemies) {
+                        if (e.hp > 0 && !z.hit.has(e) && Math.abs(Math.hypot(e.x - z.x, e.y - z.y) - cur) < 16) { z.hit.add(e); strike(z.t, e, z.dmg); }
+                    }
+                } else {
+                    z.tick++;
+                    for (const e of tdEnemies) {
+                        if (e.hp <= 0 || Math.hypot(e.x - z.x, e.y - z.y) > z.r) continue;
+                        if (z.kind === 'vortex') e.x += Math.sign(z.x - e.x) * Math.min(1.8, Math.abs(z.x - e.x));
+                        if (!z.hit.has(e)) { z.hit.add(e); strike(z.t, e, z.dmg); }
+                        else if (z.tick % (z.kind === 'rain' ? 12 : 15) === 0) { e.lastDmg = z.dmg; hurt(e, z.dmg, z.t); }
+                    }
+                }
+                if (z.life <= 0) tdZones.splice(i, 1);
+            }
+            for (let i = tdStrikes.length - 1; i >= 0; i--) {
+                const s = tdStrikes[i];
+                if (--s.delay <= 0) {
+                    for (const e of enemiesInRange(s.x, s.y, s.r)) strike(s.t, e, s.dmg);
+                    addVfxT(s.t, { k: 'boom', x: s.x, y: s.y, r: s.r, life: 16, big: true });
+                    tdStrikes.splice(i, 1);
+                }
+            }
+            for (let i = tdMines.length - 1; i >= 0; i--) {
+                const m = tdMines[i];
+                m.life--;
+                const trig = tdEnemies.find(e => e.hp > 0 && Math.hypot(e.x - m.x, e.y - m.y) < 22);
+                if (trig) {
+                    for (const e of enemiesInRange(m.x, m.y, 55)) strike(m.t, e, m.dmg);
+                    addVfxT(m.t, { k: 'boom', x: m.x, y: m.y, r: 55, life: 14 });
+                    tdMines.splice(i, 1);
+                } else if (m.life <= 0) tdMines.splice(i, 1);
+            }
+            for (let i = tdLater.length - 1; i >= 0; i--) {
+                if (--tdLater[i].delay <= 0) { const f = tdLater[i].fn; tdLater.splice(i, 1); f(); }
+            }
+        }
+
+        /* ---------- 防禦塔 / 敵人 ---------- */
+        function stepTower(t) {
+            if (t.cd > 0) t.cd--;
+            if (t.mode === 16) {
+                t.orbAng += 0.12;
+                const R = t.range * 0.7, d = towerDmg(t) * MODES[16].dm;
+                for (let k = 0; k < 3; k++) {
+                    const a = t.orbAng + k * 2.094, ox = t.x + Math.cos(a) * R, oy = t.y + Math.sin(a) * R;
+                    for (const e of tdEnemies) {
+                        if (e.hp <= 0 || Math.hypot(e.x - ox, e.y - oy) > 17) continue;
+                        if (e.orbT[t.uid] > 0) continue;
+                        e.orbT[t.uid] = 12;
+                        strike(t, e, d);
+                    }
+                }
+                const n = pickTarget(t);
+                if (n) t.angle = Math.atan2(n.y - t.y, n.x - t.x);
+                return;
+            }
+            if (t.cd > 0) return;
+            const target = pickTarget(t);
+            if (!target) return;
+            const ok = fire(t, target);
+            t.cd = ok === false ? 15 : Math.max(4, Math.round(t.cdMax * MODES[t.mode].cm));
+        }
+
+        function spawnEnemy() {
+            const i = waveEnemiesSpawned;
+            let hp = 70 + (tdWave - 1) * 20, sp = 2.1 + (tdWave - 1) * 0.12, kind = 'normal', rad = 12;
+            if (tdWave >= 2 && i % 4 === 3) { kind = 'fast'; hp *= 0.6; sp *= 1.5; rad = 9; }
+            else if (tdWave >= 2 && i % 5 === 4) { kind = 'tank'; hp *= 2.2; sp *= 0.7; rad = 15; }
+            if (tdWave % 5 === 0 && i === waveEnemiesTotal - 1) { kind = 'boss'; hp *= 8; sp *= 0.6; rad = 20; }
+            tdEnemies.push({
+                x: 0, y: TD_LANE + (Math.random() - 0.5) * 30, hp, maxHp: hp, speed: sp, kind, rad,
+                slow: 0, freeze: 0, stun: 0, freezeImm: 0, stunImm: 0, burn: 0, burnD: 0, poison: 0, poisonD: 0, pst: 0,
+                vuln: 0, confuse: 0, reson: 0, resonT: 0, orbT: {}, last: null, lastDmg: 0
+            });
+            waveEnemiesSpawned++;
+        }
+
+        function stepEnemies() {
+            for (const e of tdEnemies) {
+                if (e.freezeImm > 0) e.freezeImm--;
+                if (e.stunImm > 0) e.stunImm--;
+                for (const k in e.orbT) if (e.orbT[k] > 0) e.orbT[k]--;
+                let sp = e.speed;
+                if (e.freeze > 0) { e.freeze--; sp = 0; }
+                else if (e.stun > 0) { e.stun--; sp = 0; }
+                else {
+                    if (e.slow > 0) sp *= 0.5;
+                    if (e.confuse > 0) sp = -sp * 0.8;
+                }
+                if (e.slow > 0) e.slow--;
+                if (e.confuse > 0) e.confuse--;
+                if (e.burn > 0) { e.burn--; hurt(e, e.burnD, e.last); if (e.burn === 0) e.burnD = 0; }
+                if (e.poison > 0) { e.poison--; hurt(e, e.poisonD * e.pst, e.last); if (e.poison === 0) { e.pst = 0; e.poisonD = 0; } }
+                if (e.vuln > 0) e.vuln--;
+                if (e.resonT > 0 && --e.resonT === 0) e.reson = 0;
+                e.x += sp;
+                if (e.x < 0) e.x = 0;
+            }
+        }
+
+        // 統一處理死亡：金錢、殉爆、吞噬
+        function reap() {
+            let again = true, guard = 0;
+            while (again && guard++ < 6) {
+                again = false;
+                for (let i = tdEnemies.length - 1; i >= 0; i--) {
+                    const e = tdEnemies[i];
+                    if (e.hp > 0) continue;
+                    tdEnemies.splice(i, 1);
+                    tdMoney += (18 + tdWave * 3) * (e.kind === 'boss' ? 6 : e.kind === 'tank' ? 1.5 : 1);
+                    tdMoney = Math.floor(tdMoney);
+                    const t = e.last;
+                    if (t && tdTowers.includes(t)) {
+                        if (t.eff === 19) t.bonus = Math.min(0.5, t.bonus + 0.01);
+                        if (t.eff === 2) {
+                            for (const o of enemiesInRange(e.x, e.y, 65)) hurt(o, Math.max(5, e.lastDmg * 0.6), t);
+                            addVfx({ k: 'boom', x: e.x, y: e.y, r: 65, life: 12, c1: '#ef4444', c2: '#fde047' });
+                            again = true;
+                        }
+                    }
+                    addVfx({ k: 'spark', x: e.x, y: e.y, r: 20, life: 10, c1: '#fbbf24', c2: '#ffffff' });
+                    updateTDHud();
+                }
+            }
         }
 
         function stepTD() {
+            tdFrame++;
             spawnTimer++;
             if (waveEnemiesSpawned < waveEnemiesTotal) {
-                if (spawnTimer >= 30) {
-                    spawnTimer = 0;
-                    const hpVal = 70 + (tdWave - 1) * 20;
-                    const speedVal = 2.1 + (tdWave - 1) * 0.12;
-                    tdEnemies.push({ x: 0, y: 240, hp: hpVal, maxHp: hpVal, speed: speedVal, slowed: 0, poisoned: 0 });
-                    waveEnemiesSpawned++;
-                }
+                if (spawnTimer >= 30) { spawnTimer = 0; spawnEnemy(); }
             } else if (tdEnemies.length === 0) {
                 waveClearCooldown++;
                 if (waveClearCooldown > 40) {
@@ -1526,182 +2096,349 @@
                     updateTDHud();
                 }
             }
+            stepEnemies();
+            for (const t of tdTowers) stepTower(t);
+            stepProjectiles();
+            stepZones();
+            reap();
 
-            // 敵人移動 / 狀態
-            for (const e of tdEnemies) {
-                let sp = e.speed;
-                if (e.slowed > 0) { sp *= 0.5; e.slowed--; }
-                if (e.poisoned > 0) { e.hp -= 0.6; e.poisoned--; }
-                e.x += sp;
-            }
-
-            // 防禦塔攻擊
-            for (const t of tdTowers) {
-                const cfg = t.type;
-                if (t.cd > 0) t.cd--;
-                let target = null;
-                for (const e of tdEnemies) {        // 優先打跑最前面的敵人
-                    if (e.hp <= 0) continue;
-                    if (Math.hypot(e.x - t.x, e.y - t.y) <= t.range && (!target || e.x > target.x)) target = e;
-                }
-                if (!target) continue;
-                t.angle = Math.atan2(target.y - t.y, target.x - t.x);
-                if (t.cd > 0) continue;
-
-                const dmg = t.damage;
-                const fx = cfg.fx || 'laser';
-                target.hp -= dmg;
-                activeVisualEffects.push({ type: fx, x1: t.x, y1: t.y, x2: target.x, y2: target.y, color: cfg.color, life: 6 });
-
-                if (fx === 'chain') {
-                    const nextE = tdEnemies.find(e => e !== target && e.hp > 0 && Math.hypot(e.x - target.x, e.y - target.y) < 110);
-                    if (nextE) {
-                        nextE.hp -= dmg * 0.5;
-                        activeVisualEffects.push({ type: 'chain', x1: target.x, y1: target.y, x2: nextE.x, y2: nextE.y, color: cfg.color, life: 6 });
-                    }
-                } else if (fx === 'freeze') target.slowed = 70;
-                else if (fx === 'poison') target.poisoned = 90;
-                else if (fx === 'supernova') {
-                    tdEnemies.forEach(e => { if (e !== target && Math.hypot(e.x - target.x, e.y - target.y) < 85) e.hp -= dmg * 0.7; });
-                }
-                t.cd = cfg.cd || 20;
-            }
-
-            // 統一清理死亡敵人（原本只有主要目標會被移除，範圍/連鎖/毒傷致死的敵人會殘留）
             for (let i = tdEnemies.length - 1; i >= 0; i--) {
-                if (tdEnemies[i].hp <= 0) {
-                    tdEnemies.splice(i, 1);
-                    tdMoney += 18 + tdWave * 3;
-                    updateTDHud();
-                }
-            }
-
-            // 漏怪扣血
-            for (let i = tdEnemies.length - 1; i >= 0; i--) {
-                if (tdEnemies[i].x >= 680) {
+                if (tdEnemies[i].x >= TD_W) {
                     tdEnemies.splice(i, 1);
                     tdHP--;
                     if (tdHP <= 0) { tdHP = 0; tdGameOver = true; }
                     updateTDHud();
                 }
             }
-
-            for (let i = activeVisualEffects.length - 1; i >= 0; i--) {
-                activeVisualEffects[i].life--;
-                if (activeVisualEffects[i].life <= 0) activeVisualEffects.splice(i, 1);
+            for (let i = tdVfx.length - 1; i >= 0; i--) if (--tdVfx[i].life <= 0) tdVfx.splice(i, 1);
+            for (let i = tdParts.length - 1; i >= 0; i--) {
+                const p = tdParts[i]; p.x += p.vx; p.y += p.vy; if (--p.life <= 0) tdParts.splice(i, 1);
             }
+        }
+
+        function tdTick() {
+            if (!tdIsPaused && !tdGameOver) for (let i = 0; i < tdSpeed; i++) { stepTD(); if (tdGameOver) break; }
+            if (tdMessageLife > 0) tdMessageLife--;
+            drawTD();
+        }
+
+        /* ================= 繪圖 ================= */
+        // 20 種外殼：3 到 12 邊形，以及 4 到 13 角星形
+        function bodyPath(ctx, shape, r) {
+            ctx.beginPath();
+            if (shape <= 10) {
+                const n = shape + 2;
+                for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r); }
+            } else {
+                const n = shape - 7;
+                for (let i = 0; i < n * 2; i++) {
+                    const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? r * 0.58 : r * 1.08;
+                    ctx[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr);
+                }
+            }
+            ctx.closePath();
+        }
+
+        function drawTowerGfx(ctx, def, x, y, angle, level, alpha, extra) {
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(x, y);
+            // 外環：由第二座塔決定圓點數量與旋轉方向
+            if (def.ring > 0) {
+                const n = def.ring + 2, rot = (tdFrame * 0.02) * (def.ring % 2 ? 1 : -1);
+                ctx.fillStyle = def.color2;
+                for (let i = 0; i < n; i++) {
+                    const a = rot + i * 2 * Math.PI / n;
+                    ctx.beginPath(); ctx.arc(Math.cos(a) * 31, Math.sin(a) * 31, 2.2, 0, 6.29); ctx.fill();
+                }
+            }
+            // 砲管
+            ctx.save();
+            ctx.rotate(angle);
+            ctx.fillStyle = def.color;
+            ctx.fillRect(0, -4, def.fused ? 30 : 25, 8);
+            if (def.fused) { ctx.fillStyle = def.color2; ctx.fillRect(14, -2, 14, 4); }
+            ctx.restore();
+            // 外殼
+            const g = ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
+            g.addColorStop(0, def.fused ? def.color2 : '#334155');
+            g.addColorStop(1, '#0f172a');
+            ctx.fillStyle = g;
+            bodyPath(ctx, def.shape, 23);
+            ctx.fill();
+            ctx.strokeStyle = def.color; ctx.lineWidth = def.fused ? 3.5 : 2.5;
+            ctx.stroke();
+            if (def.fused) {
+                ctx.strokeStyle = def.color2; ctx.lineWidth = 1.2;
+                bodyPath(ctx, def.shape, 16); ctx.stroke();
+            }
+            // 圖案
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (def.fused) {
+                ctx.font = '17px sans-serif'; ctx.fillText(def.icon, -5, -3);
+                ctx.font = '13px sans-serif'; ctx.fillText(def.icon2, 9, 8);
+            } else { ctx.font = '19px sans-serif'; ctx.fillText(def.icon, 0, 1); }
+            if (level) {
+                ctx.fillStyle = def.fused ? '#22c55e' : '#ffffff';
+                ctx.font = 'bold 11px sans-serif'; ctx.fillText(`★×${level}`, 0, -34);
+            }
+            if (extra && extra.orbit) {
+                ctx.fillStyle = def.color;
+                for (let k = 0; k < 3; k++) {
+                    const a = extra.orbAng + k * 2.094;
+                    ctx.beginPath(); ctx.arc(Math.cos(a) * extra.R, Math.sin(a) * extra.R, 6, 0, 6.29); ctx.fill();
+                    ctx.strokeStyle = def.color2; ctx.lineWidth = 2; ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawEnemy(ctx, e) {
+            const r = e.rad;
+            ctx.fillStyle = '#334155'; ctx.fillRect(e.x - 14, e.y - r - 10, 28, 4);
+            ctx.fillStyle = e.poison > 0 ? '#84cc16' : '#ef4444';
+            ctx.fillRect(e.x - 14, e.y - r - 10, (Math.max(0, e.hp) / e.maxHp) * 28, 4);
+            let col = '#ef4444';
+            if (e.kind === 'fast') col = '#f59e0b'; else if (e.kind === 'tank') col = '#a16207'; else if (e.kind === 'boss') col = '#7f1d1d';
+            if (e.freeze > 0) col = '#bae6fd'; else if (e.stun > 0) col = '#fde047'; else if (e.slow > 0) col = '#818cf8';
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, 6.29); ctx.fill();
+            ctx.strokeStyle = e.kind === 'boss' ? '#fbbf24' : '#fca5a5'; ctx.lineWidth = e.kind === 'boss' ? 3 : 2; ctx.stroke();
+            ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            if (e.burn > 0) ctx.fillText('🔥', e.x - 8, e.y - r - 16);
+            if (e.stun > 0) ctx.fillText('⭐', e.x + 8, e.y - r - 16);
+            if (e.confuse > 0) ctx.fillText('💫', e.x, e.y - r - 18);
+            if (e.pst > 0) { ctx.fillStyle = '#84cc16'; ctx.fillText('☠'.repeat(1) + e.pst, e.x, e.y + r + 9); }
+            if (e.vuln > 0) { ctx.strokeStyle = '#f472b6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, r + 4, 0, 6.29); ctx.stroke(); }
+            if (e.reson > 0) { ctx.fillStyle = '#facc15'; ctx.fillText('〰'.repeat(e.reson), e.x, e.y + r + 9); }
+        }
+
+        function drawVfx(ctx, v) {
+            const a = v.life / v.max, prog = 1 - a;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, a * 1.4);
+            switch (v.k) {
+                case 'beam':
+                    ctx.shadowBlur = 14; ctx.shadowColor = v.c1;
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 5; line(ctx, v.x1, v.y1, v.x2, v.y2);
+                    ctx.strokeStyle = v.c2; ctx.lineWidth = 2; line(ctx, v.x1, v.y1, v.x2, v.y2);
+                    break;
+                case 'twin': {
+                    const dx = v.y2 - v.y1, dy = v.x1 - v.x2, l = Math.hypot(dx, dy) || 1, ox = dx / l * 4, oy = dy / l * 4;
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 2.5; ctx.shadowBlur = 8; ctx.shadowColor = v.c1;
+                    line(ctx, v.x1 + ox, v.y1 + oy, v.x2, v.y2); line(ctx, v.x1 - ox, v.y1 - oy, v.x2, v.y2);
+                    break;
+                }
+                case 'snipe':
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 1.6; ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+                    line(ctx, v.x1, v.y1, v.x2, v.y2);
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 8 * a; ctx.globalAlpha = a * 0.5; line(ctx, v.x2 - 20, v.y2, v.x2 + 20, v.y2);
+                    ctx.beginPath(); ctx.arc(v.x2, v.y2, 6 + 16 * prog, 0, 6.29); ctx.stroke();
+                    break;
+                case 'bolt': {
+                    ctx.shadowBlur = 12; ctx.shadowColor = v.c1;
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 10 * a + 2; line(ctx, v.x1, v.y1, v.x2, v.y2);
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; line(ctx, v.x1, v.y1, v.x2, v.y2);
+                    break;
+                }
+                case 'lightning':
+                    ctx.shadowBlur = 12; ctx.shadowColor = v.c1; ctx.lineJoin = 'round';
+                    for (const [w, c] of [[5, v.c1], [1.6, '#fff']]) {
+                        ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
+                        v.pts.forEach((p, i) => {
+                            const jx = i && i < v.pts.length - 1 ? ((tdFrame * 7 + i * 13) % 9 - 4) : 0;
+                            ctx[i ? 'lineTo' : 'moveTo'](p.x + jx, p.y);
+                        });
+                        ctx.stroke();
+                    }
+                    break;
+                case 'wedge':
+                    ctx.fillStyle = v.c1; ctx.globalAlpha = a * 0.45;
+                    ctx.beginPath(); ctx.moveTo(v.x, v.y); ctx.arc(v.x, v.y, v.r, v.ang - 0.55, v.ang + 0.55); ctx.closePath(); ctx.fill();
+                    ctx.globalAlpha = a; ctx.strokeStyle = v.c2; ctx.lineWidth = 2; ctx.stroke();
+                    break;
+                case 'boom': {
+                    const rr = v.r * (0.35 + 0.65 * prog);
+                    ctx.fillStyle = v.c1; ctx.globalAlpha = a * 0.5;
+                    ctx.beginPath(); ctx.arc(v.x, v.y, rr, 0, 6.29); ctx.fill();
+                    ctx.globalAlpha = a; ctx.strokeStyle = v.c2; ctx.lineWidth = v.big ? 5 : 3;
+                    ctx.beginPath(); ctx.arc(v.x, v.y, rr, 0, 6.29); ctx.stroke();
+                    break;
+                }
+                case 'ringfx':
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(v.x, v.y, v.r * (0.3 + 0.7 * prog), 0, 6.29); ctx.stroke();
+                    break;
+                case 'spark':
+                    ctx.strokeStyle = v.c1; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(v.x, v.y, v.r * (0.3 + 0.7 * prog), 0, 6.29); ctx.stroke();
+                    ctx.fillStyle = v.c2; ctx.beginPath(); ctx.arc(v.x, v.y, 3 * a + 1, 0, 6.29); ctx.fill();
+                    break;
+                case 'trail':
+                    ctx.fillStyle = v.c1; ctx.globalAlpha = a * 0.6;
+                    ctx.beginPath(); ctx.arc(v.x, v.y, v.r * a, 0, 6.29); ctx.fill();
+                    break;
+            }
+            ctx.restore();
+        }
+        function line(ctx, x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+
+        function drawZone(ctx, z) {
+            const a = z.life / z.max, prog = 1 - a;
+            const c1 = z.t.type.color, c2 = z.t.type.color2;
+            ctx.save();
+            if (z.kind === 'ring') {
+                const cur = z.r * prog;
+                ctx.globalAlpha = Math.min(1, a * 1.3);
+                ctx.strokeStyle = c1; ctx.lineWidth = z.style === 'quake' ? 7 : 4;
+                ctx.beginPath(); ctx.arc(z.x, z.y, cur, 0, 6.29); ctx.stroke();
+                ctx.strokeStyle = c2; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(z.x, z.y, cur * 0.86, 0, 6.29); ctx.stroke();
+                if (z.style === 'quake') {
+                    ctx.strokeStyle = '#a16207'; ctx.lineWidth = 2;
+                    for (let k = 0; k < 8; k++) { const ag = k * 0.785 + 0.3; line(ctx, z.x + Math.cos(ag) * cur * 0.5, z.y + Math.sin(ag) * cur * 0.5, z.x + Math.cos(ag) * cur, z.y + Math.sin(ag) * cur); }
+                }
+            } else if (z.kind === 'rain') {
+                ctx.globalAlpha = 0.22; ctx.fillStyle = c1;
+                ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, 6.29); ctx.fill();
+                ctx.globalAlpha = 0.9; ctx.strokeStyle = c2; ctx.lineWidth = 1.6;
+                for (let k = 0; k < 14; k++) {
+                    const rx = z.x + ((k * 37 + tdFrame * 3) % (z.r * 2)) - z.r, ry = z.y - z.r + ((k * 53 + tdFrame * 9) % (z.r * 2));
+                    if (Math.hypot(rx - z.x, ry - z.y) < z.r) line(ctx, rx, ry, rx - 2, ry + 8);
+                }
+            } else if (z.kind === 'vortex') {
+                ctx.globalAlpha = 0.3; ctx.fillStyle = '#020617';
+                ctx.beginPath(); ctx.arc(z.x, z.y, z.r * 0.5, 0, 6.29); ctx.fill();
+                ctx.globalAlpha = Math.min(1, a * 2); ctx.strokeStyle = c1; ctx.lineWidth = 2.5;
+                for (let k = 0; k < 3; k++) {
+                    ctx.beginPath();
+                    for (let s = 0; s <= 24; s++) {
+                        const ag = tdFrame * 0.2 + k * 2.094 + s * 0.22, rr = z.r * (1 - s / 26);
+                        ctx[s ? 'lineTo' : 'moveTo'](z.x + Math.cos(ag) * rr, z.y + Math.sin(ag) * rr);
+                    }
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawProjectile(ctx, p) {
+            const c1 = p.t.type.color, c2 = p.t.type.color2;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.shadowBlur = 8; ctx.shadowColor = c1;
+            switch (p.kind) {
+                case 'shell':
+                    ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(0, 0, 7, 0, 6.29); ctx.fill();
+                    ctx.strokeStyle = c2; ctx.lineWidth = 2; ctx.stroke(); break;
+                case 'missile':
+                    ctx.rotate(p.ang || 0); ctx.fillStyle = c1;
+                    ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-6, -4); ctx.lineTo(-3, 0); ctx.lineTo(-6, 4); ctx.closePath(); ctx.fill();
+                    ctx.fillStyle = c2; ctx.fillRect(-9, -1.5, 4, 3); break;
+                case 'boom':
+                    ctx.rotate(p.spin); ctx.strokeStyle = c1; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.arc(0, 0, 10, 0.3, 2.5); ctx.stroke();
+                    ctx.strokeStyle = c2; ctx.beginPath(); ctx.arc(0, 0, 10, 3.4, 5.6); ctx.stroke(); break;
+                case 'bullet':
+                    ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(0, 0, 4, 0, 6.29); ctx.fill(); break;
+                case 'frag':
+                    ctx.fillStyle = c2; ctx.beginPath(); ctx.arc(0, 0, 3, 0, 6.29); ctx.fill(); break;
+                case 'split':
+                    ctx.rotate(tdFrame * 0.3); ctx.fillStyle = c1;
+                    ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(8, 0); ctx.lineTo(0, 8); ctx.lineTo(-8, 0); ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = c2; ctx.lineWidth = 1.5; ctx.stroke(); break;
+                case 'ric':
+                    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, 6.29); ctx.fill();
+                    ctx.strokeStyle = c1; ctx.lineWidth = 3; ctx.stroke(); break;
+            }
+            ctx.restore();
         }
 
         function drawTD() {
             const ctx = tdCtx;
             if (!ctx) return;
-            ctx.clearRect(0, 0, 680, 480);
+            ctx.clearRect(0, 0, TD_W, TD_H);
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
-            for (let x = 0; x < 680; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 480); ctx.stroke(); }
-            for (let y = 0; y < 480; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(680, y); ctx.stroke(); }
+            for (let x = 0; x < TD_W; x += 40) line(ctx, x, 0, x, TD_H);
+            for (let y = 0; y < TD_H; y += 40) line(ctx, 0, y, TD_W, y);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)'; ctx.lineWidth = 60; line(ctx, 0, TD_LANE, TD_W, TD_LANE);
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; line(ctx, 0, TD_LANE, TD_W, TD_LANE);
 
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)'; ctx.lineWidth = 60;
-            ctx.beginPath(); ctx.moveTo(0, 240); ctx.lineTo(680, 240); ctx.stroke();
-            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(0, 240); ctx.lineTo(680, 240); ctx.stroke();
-
-            // 敵人
-            for (const e of tdEnemies) {
-                ctx.fillStyle = '#334155'; ctx.fillRect(e.x - 14, e.y - 22, 28, 4);
-                ctx.fillStyle = e.poisoned > 0 ? '#84cc16' : '#ef4444';
-                ctx.fillRect(e.x - 14, e.y - 22, (Math.max(0, e.hp) / e.maxHp) * 28, 4);
-                ctx.fillStyle = e.slowed > 0 ? '#38bdf8' : '#ef4444';
-                ctx.beginPath(); ctx.arc(e.x, e.y, 12, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = '#fca5a5'; ctx.lineWidth = 2; ctx.stroke();
+            // 地雷
+            for (const m of tdMines) {
+                ctx.fillStyle = m.t.type.color; ctx.beginPath(); ctx.arc(m.x, m.y, 7, 0, 6.29); ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+                if ((tdFrame >> 3) % 2 === 0) { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(m.x, m.y, 2.5, 0, 6.29); ctx.fill(); }
+            }
+            // 區域效果、預告圈
+            tdZones.forEach(z => drawZone(ctx, z));
+            for (const s of tdStrikes) {
+                const k = s.delay / s.max;
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.29); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(239,68,68,0.25)'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * (1 - k), 0, 6.29); ctx.fill();
             }
 
-            // 選中塔的範圍
+            tdEnemies.forEach(e => drawEnemy(ctx, e));
+
             if (selectedPlacedTower) {
                 ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
-                ctx.beginPath(); ctx.arc(selectedPlacedTower.x, selectedPlacedTower.y, selectedPlacedTower.range, 0, Math.PI * 2); ctx.stroke();
+                ctx.beginPath(); ctx.arc(selectedPlacedTower.x, selectedPlacedTower.y, selectedPlacedTower.range, 0, 6.29); ctx.stroke();
                 ctx.setLineDash([]);
             }
 
+            const hoverT = isHoveringCanvas ? towerAt(mouseX, mouseY) : null;
+            if (hoverT && hoverT !== selectedPlacedTower) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(hoverT.x, hoverT.y, hoverT.range, 0, 6.29); ctx.stroke();
+            }
+
             // 建塔預覽
-            if (isHoveringCanvas && !tdGameOver && !fusionSourceTower) {
+            if (isHoveringCanvas && !tdGameOver && !fusionSourceTower && !hoverT) {
                 const onTrack = mouseY > 200 && mouseY < 280;
                 const tooClose = tdTowers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 50);
-                const overTower = tdTowers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 25);
-                if (!overTower) {
-                    const isValid = !onTrack && !tooClose && tdMoney >= selectedTowerType.cost;
-                    ctx.strokeStyle = isValid ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 1;
-                    ctx.beginPath(); ctx.arc(mouseX, mouseY, selectedTowerType.range, 0, Math.PI * 2); ctx.stroke();
-                    ctx.save();
-                    ctx.globalAlpha = 0.5; ctx.translate(mouseX, mouseY);
-                    ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = isValid ? selectedTowerType.color : '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
-                    ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(selectedTowerType.icon, 0, 0);
-                    ctx.restore();
-                }
+                const ok = !onTrack && !tooClose && tdMoney >= selectedTowerType.cost;
+                ctx.strokeStyle = ok ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(mouseX, mouseY, selectedTowerType.range, 0, 6.29); ctx.stroke();
+                drawTowerGfx(ctx, selectedTowerType, mouseX, mouseY, 0, 0, ok ? 0.55 : 0.3);
             }
 
             // 防禦塔
             for (const t of tdTowers) {
-                const cfg = t.type;
-                ctx.save();
-                ctx.translate(t.x, t.y);
-                ctx.fillStyle = t.isFusion ? '#581c87' : '#1e293b';
-                ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = cfg.color; ctx.lineWidth = t.isFusion ? 4 : 3; ctx.stroke();
+                const extra = t.mode === 16 ? { orbit: true, orbAng: t.orbAng - t.angle, R: t.range * 0.7 } : null;
+                drawTowerGfx(ctx, t.type, t.x, t.y, t.angle, t.level, 1, extra);
                 if (t === fusionSourceTower) {
                     ctx.strokeStyle = '#a855f7'; ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(t.x, t.y, 32, 0, 6.29); ctx.stroke();
                 }
-                ctx.fillStyle = t.isFusion ? '#22c55e' : '#ffffff';
-                ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-                ctx.fillText(`★×${t.level}`, 0, -29);
-                ctx.rotate(t.angle);
-                ctx.fillStyle = cfg.color;
-                ctx.fillRect(0, -5, t.isFusion ? 28 : 24, 10);
-                ctx.rotate(-t.angle);
-                ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(cfg.icon, 0, 0);
-                ctx.restore();
             }
 
-            // 攻擊特效
-            for (const fx of activeVisualEffects) {
-                ctx.save();
-                if (fx.type === 'plasma') {
-                    ctx.fillStyle = fx.color;
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 22 + (6 - fx.life) * 2, 0, Math.PI * 2); ctx.fill();
-                } else if (fx.type === 'freeze') {
-                    ctx.strokeStyle = '#a5f3fc'; ctx.lineWidth = 4;
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 16 + (6 - fx.life) * 3, 0, Math.PI * 2); ctx.stroke();
-                } else if (fx.type === 'poison') {
-                    ctx.fillStyle = '#84cc16';
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 18, 0, Math.PI * 2); ctx.fill();
-                } else if (fx.type === 'supernova') {
-                    ctx.fillStyle = 'rgba(239, 68, 68, 0.45)';
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 80, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = '#f97316'; ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, (6 - fx.life) * 14, 0, Math.PI * 2); ctx.stroke();
-                } else {
-                    ctx.strokeStyle = fx.color; ctx.lineWidth = 4; ctx.shadowBlur = 12; ctx.shadowColor = fx.color;
-                    ctx.beginPath(); ctx.moveTo(fx.x1, fx.y1); ctx.lineTo(fx.x2, fx.y2); ctx.stroke();
-                    ctx.fillStyle = '#ffffff';
-                    ctx.beginPath(); ctx.arc(fx.x2, fx.y2, 7, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.restore();
-            }
+            tdProj.forEach(p => drawProjectile(ctx, p));
+            tdVfx.forEach(v => drawVfx(ctx, v));
+            ctx.font = '13px sans-serif';
+            for (const p of tdParts) { ctx.globalAlpha = p.life / p.max; ctx.fillText(p.glyph, p.x, p.y); }
+            ctx.globalAlpha = 1;
 
             // 提示文字
             ctx.save();
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             if (fusionSourceTower) {
-                ctx.fillStyle = 'rgba(88, 28, 135, 0.85)'; ctx.fillRect(140, 8, 400, 30);
+                ctx.fillStyle = 'rgba(88, 28, 135, 0.9)'; ctx.fillRect(90, 8, 500, 46);
                 ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif';
-                ctx.fillText(`請點選要融合的另一座塔，點空白處取消`, 340, 23);
+                ctx.fillText(`請點選要融合的另一座基礎塔，點空白處取消。花費 $${TD_FUSION_COST}`, 340, 23);
+                const other = hoverT && hoverT !== fusionSourceTower && !hoverT.isFusion ? hoverT : null;
+                ctx.font = '13px sans-serif'; ctx.fillStyle = '#fde68a';
+                if (other) {
+                    const d = getFusion(fusionSourceTower.type.id, other.type.id);
+                    ctx.fillText(`${fusionSourceTower.type.id} ＋ ${other.type.id} ＝ ${towerLabel(d)}｜${MODES[d.mode].name}｜${EFFECTS[d.eff].name}`, 340, 42);
+                } else ctx.fillText('第一座提供攻擊方式，第二座提供命中效果', 340, 42);
             } else if (tdMessageLife > 0) {
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(190, 8, 300, 30);
-                ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 14px sans-serif';
+                ctx.font = 'bold 14px sans-serif';
+                const w = Math.max(220, ctx.measureText(tdMessage).width + 30);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)'; ctx.fillRect(340 - w / 2, 8, w, 30);
+                ctx.fillStyle = '#fbbf24';
                 ctx.fillText(tdMessage, 340, 23);
             }
             if (tdIsPaused && !tdGameOver) {
@@ -1709,7 +2446,7 @@
                 ctx.fillText('⏸ 已暫停', 340, 120);
             }
             if (tdGameOver) {
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.fillRect(0, 0, 680, 480);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.fillRect(0, 0, TD_W, TD_H);
                 ctx.fillStyle = '#ef4444'; ctx.font = 'bold 36px sans-serif';
                 ctx.fillText('GAME OVER 遊戲結束', 340, 220);
                 ctx.fillStyle = '#f8fafc'; ctx.font = '18px sans-serif';
