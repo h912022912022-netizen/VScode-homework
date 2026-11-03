@@ -287,6 +287,25 @@
         .recipe-table th { background: #1e293b; padding: 3px 5px; position: sticky; top: 0; font-weight: normal; white-space: nowrap; }
         .recipe-table td { border: 1px solid #334155; text-align: center; min-width: 34px; padding: 4px 2px; cursor: default; }
         .recipe-table td:hover { background: #0284c7; color: #fff; }
+
+        #td-play { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #td-levels { display: none; width: 100%; max-width: 1050px; }
+        #lv-banner { display: none; background: #064e3b; border: 1px solid #34d399; color: #a7f3d0; padding: 12px 16px; border-radius: 10px; margin-bottom: 14px; font-weight: bold; text-align: center; }
+        .lv-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; color: #94a3b8; font-size: 0.85rem; }
+        .lv-head h3 { margin: 0; color: var(--accent-color); font-size: 1.2rem; }
+        .lv-head span { flex: 1; min-width: 240px; }
+        #lv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .lv-card { position: relative; background: #1e293b; border: 2px solid #334155; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+        .lv-card canvas { display: block; width: 100%; height: auto; background: #090d16; }
+        .lv-info { padding: 10px 12px; }
+        .lv-name { font-weight: bold; margin-bottom: 4px; }
+        .lv-meta { font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; }
+        .lv-state { font-size: 0.8rem; color: #cbd5e1; }
+        .lv-card.cleared { border-color: #34d399; }
+        .lv-card.next { border-color: #38bdf8; box-shadow: 0 0 14px rgba(56,189,248,0.4); }
+        .lv-card.cleared:hover, .lv-card.next:hover { transform: translateY(-4px); }
+        .lv-card.locked { cursor: not-allowed; opacity: 0.45; filter: grayscale(0.8); }
+        .lv-lock { position: absolute; top: 40px; left: 0; right: 0; text-align: center; font-size: 2.4rem; }
     </style>
 </head>
 <body>
@@ -310,9 +329,9 @@
             <div class="cover-img cover-2">🏰🏹</div>
             <div class="card-body">
                 <div>
-                    <div class="card-title">欄位 2：經典塔防戰鬥</div>
+                    <div class="card-title">欄位 2：賽博塔防闖關</div>
                     <div class="card-meta">作者: Developer | 策略防守</div>
-                    <div class="card-desc">位置固定選單、無彈窗融合、100% 絕對零衝突固定配方！</div>
+                    <div class="card-desc">20 種基礎塔、400 種固定融合配方，10 張不同地圖的闖關塔防。</div>
                 </div>
                 <button class="play-btn" onclick="openGame('game2')">▶ 開始遊戲</button>
             </div>
@@ -379,6 +398,17 @@
             <h2>🏰 賽博科技塔防</h2>
             <button class="back-btn" onclick="closeGame('game2')">← 返回大廳</button>
         </div>
+        <div id="td-levels">
+            <div id="lv-banner"></div>
+            <div class="lv-head">
+                <h3>選擇關卡</h3>
+                <span>每一關的地圖、波數與怪物強度都不同。只能挑戰已通關的關卡和下一關，進入關卡時生命與金錢會重置。</span>
+                <button class="ctrl-btn" onclick="resetTDProgress()">清除進度</button>
+            </div>
+            <div id="lv-grid"></div>
+        </div>
+
+        <div id="td-play">
         <div class="controls">
             <button class="ctrl-btn" id="td-pause-btn" onclick="toggleTDPause()">暫停</button>
             <label>倍速：</label>
@@ -387,10 +417,12 @@
                 <option value="2">2x</option>
                 <option value="3">3x</option>
             </select>
-            <span style="margin-left: 10px;">關卡: <b id="td-wave" style="color:#38bdf8;">1</b></span>
+            <span style="margin-left: 10px;">關卡 <b id="td-level" style="color:#38bdf8;">1</b></span>
+            <span style="margin-left: 10px;">波數 <b id="td-wave" style="color:#38bdf8;">1/7</b></span>
             <span style="margin-left: 10px;">金錢: <b id="td-money" style="color:#f59e0b;">500</b></span>
             <span style="margin-left: 10px;">生命: <b id="td-hp" style="color:#ef4444;">10</b></span>
-            <button class="ctrl-btn" onclick="initTD()">重來</button>
+            <button class="ctrl-btn" onclick="restartLevel()">重來</button>
+            <button class="ctrl-btn" onclick="showLevelSelect('')">選關</button>
             <button class="ctrl-btn" onclick="toggleRecipe()">📖 配方表</button>
         </div>
 
@@ -412,6 +444,7 @@
                 <div class="shop-title">🛠️ 武器商店</div>
                 <div class="shop-grid" id="tower-shop"></div>
             </div>
+        </div>
         </div>
 
         <div id="td-recipe">
@@ -446,7 +479,7 @@
         function openGame(id) {
             document.getElementById(id).style.display = 'flex';
             if (id === 'game1') { updateDifficultyOptions(); initBoardGame(); }
-            if (id === 'game2') initTD();
+            if (id === 'game2') openTD();
             if (id === 'game3') initMemoryGame();
         }
         function closeGame(id) {
@@ -1266,7 +1299,7 @@
             }
             currentPlayer = nextSide + '棋';
             const mustCapture = ckAllMoves(gameState, nextSide, -1).some(x => x.cap >= 0);
-            setStatus(`輪到玩家：${currentPlayer}`);
+            setStatus(`輪到玩家：${currentPlayer}${mustCapture ? '（必須吃子）' : ''}`);
             renderBoard('checkers', 8);
             if (isAITurn('checkers', opp)) scheduleAI(() => ckAIMove(opp), 450);
         }
@@ -1293,8 +1326,65 @@
         }
 
         /* ================= 遊戲 2 邏輯：科技塔防，20 種基礎塔 × 400 種固定融合配方 ================= */
-        const TD_W = 680, TD_H = 480, TD_LANE = 240;
+        const TD_W = 680, TD_H = 480, TD_ROAD = 34;   // TD_ROAD 為建塔時離路徑的最小距離
         const TD_MAX_LEVEL = 5, TD_FUSION_COST = 150;
+
+        /* ---------- 10 個關卡：每關地圖、波數、難度都不同 ---------- */
+        const TD_LEVELS = [
+            { name: '直線突擊', color: '#38bdf8', pts: [[0, 240], [680, 240]] },
+            { name: 'S 型彎道', color: '#34d399', pts: [[0, 90], [560, 90], [560, 240], [120, 240], [120, 390], [680, 390]] },
+            { name: 'U 型迴廊', color: '#a78bfa', pts: [[0, 70], [600, 70], [600, 410], [0, 410]] },
+            { name: '對角閃電', color: '#fb923c', pts: [[0, 50], [620, 50], [60, 430], [680, 430]] },
+            { name: '螺旋深淵', color: '#f472b6', pts: [[0, 40], [640, 40], [640, 440], [40, 440], [40, 130], [550, 130], [550, 350], [140, 350], [140, 240], [400, 240]] },
+            { name: '方波長廊', color: '#facc15', pts: [[0, 390], [130, 390], [130, 110], [270, 110], [270, 390], [410, 390], [410, 110], [550, 110], [550, 390], [680, 390]] },
+            { name: '十字交錯', color: '#f87171', pts: [[0, 70], [560, 70], [560, 420], [120, 420], [120, 240], [680, 240]] },
+            { name: '蛇行峽谷', color: '#2dd4bf', pts: [[0, 50], [640, 50], [640, 140], [40, 140], [40, 230], [640, 230], [640, 320], [40, 320], [40, 410], [680, 410]] },
+            { name: '菱形星陣', color: '#818cf8', pts: [[0, 240], [340, 30], [650, 240], [340, 450], [110, 240], [340, 120], [520, 240]] },
+            { name: '終極迷宮', color: '#fbbf24', pts: [[0, 50], [340, 50], [340, 150], [60, 150], [60, 270], [260, 270], [260, 370], [60, 370], [60, 440], [420, 440], [420, 260], [520, 260], [520, 150], [640, 150], [640, 340]] }
+        ];
+        function buildPath(pts) {
+            const segs = []; let total = 0;
+            for (let i = 0; i < pts.length - 1; i++) {
+                const [x1, y1] = pts[i], [x2, y2] = pts[i + 1], len = Math.hypot(x2 - x1, y2 - y1);
+                segs.push({ x1, y1, x2, y2, len, start: total, nx: -(y2 - y1) / len, ny: (x2 - x1) / len });
+                total += len;
+            }
+            return { pts, segs, total };
+        }
+        TD_LEVELS.forEach((lv, i) => {
+            lv.id = i + 1;
+            lv.waves = 6 + lv.id;                 // 第 1 關 7 波，第 10 關 16 波
+            lv.hpMul = 1 + 0.55 * i;              // 怪物血量倍率
+            lv.money = 500 + 120 * i;             // 起始金錢
+            lv.hp = 10;                           // 起始生命
+            lv.rew = 1 + 0.2 * i;                 // 擊殺與過波獎勵倍率
+            lv.path = buildPath(lv.pts);
+        });
+        function posAt(path, d) {
+            d = Math.max(0, Math.min(path.total, d));
+            let seg = path.segs[path.segs.length - 1];
+            for (const sg of path.segs) if (d <= sg.start + sg.len) { seg = sg; break; }
+            const u = (d - seg.start) / seg.len;
+            return { x: seg.x1 + (seg.x2 - seg.x1) * u, y: seg.y1 + (seg.y2 - seg.y1) * u, nx: seg.nx, ny: seg.ny };
+        }
+        function distToPath(x, y) {
+            let m = Infinity;
+            for (const sg of tdPathData.segs) m = Math.min(m, distToSeg(x, y, sg.x1, sg.y1, sg.x2, sg.y2));
+            return m;
+        }
+        function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; }
+        // 敵人以「沿路徑走過的距離 d」定位，x、y 由 d 推算出來
+        function setPos(e) { const p = posAt(tdPathData, e.d); e.x = p.x + p.nx * e.off; e.y = p.y + p.ny * e.off; }
+        function ahead(e, dist) { const p = posAt(tdPathData, e.d + dist); return { x: p.x + p.nx * e.off, y: p.y + p.ny * e.off }; }
+        function pullToward(e, x, y, amt) {
+            let best = e.d, bd = Math.hypot(e.x - x, e.y - y);
+            for (const nd of [e.d - amt, e.d + amt]) {
+                if (nd < 0 || nd > tdPathData.total) continue;
+                const p = posAt(tdPathData, nd), dd = Math.hypot(p.x + p.nx * e.off - x, p.y + p.ny * e.off - y);
+                if (dd < bd) { bd = dd; best = nd; }
+            }
+            e.d = best; setPos(e);
+        }
 
         /* ---------- 20 種基礎塔 ---------- */
         // pre 與 suf 用來組合 400 個不重複的融合塔名稱：前綴取自第一座塔，後綴取自第二座塔
@@ -1423,12 +1513,14 @@
         let selectedPlacedTower = null, fusionSourceTower = null;
         let mouseX = -1, mouseY = -1, isHoveringCanvas = false;
         let tdMessage = '', tdMessageLife = 0, tdFrame = 0, tdUid = 1;
+        let tdLevel = TD_LEVELS[0], tdPathData = TD_LEVELS[0].path, tdMaxCleared = 0, tdWon = false, tdProgressLoaded = false;
 
         function tdNotify(t) { tdMessage = t; tdMessageLife = 70; }
         function updateTDHud() {
             document.getElementById('td-money').innerText = tdMoney;
             document.getElementById('td-hp').innerText = tdHP;
-            document.getElementById('td-wave').innerText = tdWave;
+            document.getElementById('td-level').innerText = tdLevel.id;
+            document.getElementById('td-wave').innerText = `${tdWave}/${tdLevel.waves}`;
         }
         function tdCanvasPos(e) {
             const r = tdCanvas.getBoundingClientRect();
@@ -1447,12 +1539,14 @@
             return t;
         }
 
-        function initTD() {
+        function initTD(levelId) {
+            tdLevel = TD_LEVELS[(levelId || 1) - 1];
+            tdPathData = tdLevel.path;
             tdCanvas = document.getElementById('td-canvas');
             tdCtx = tdCanvas.getContext('2d');
-            tdMoney = 500; tdHP = 10; tdWave = 1;
+            tdMoney = tdLevel.money; tdHP = tdLevel.hp; tdWave = 1;       // 每一關的生命、金錢、地圖都重新開始
             waveEnemiesSpawned = 0; waveEnemiesTotal = 8; waveClearCooldown = 0; spawnTimer = 0;
-            tdTowers = []; tdEnemies = []; tdGameOver = false;
+            tdTowers = []; tdEnemies = []; tdGameOver = false; tdWon = false;
             tdProj = []; tdZones = []; tdMines = []; tdStrikes = []; tdLater = []; tdVfx = []; tdParts = [];
             tdIsPaused = false; document.getElementById('td-pause-btn').innerText = '暫停';
             tdSpeed = parseInt(document.getElementById('td-speed').value) || 1;
@@ -1487,7 +1581,7 @@
                 }
                 closeUpgradeMenu();
 
-                if (y > 200 && y < 280) { tdNotify('這裡是敵人路徑，不能建塔'); return; }
+                if (distToPath(x, y) < TD_ROAD) { tdNotify('這裡是敵人路徑，不能建塔'); return; }
                 if (tdTowers.some(t => Math.hypot(t.x - x, t.y - y) < 50)) { tdNotify('離其他塔太近了'); return; }
                 if (tdMoney < selectedTowerType.cost) { tdNotify('金錢不足'); return; }
                 placeTower(selectedTowerType, x, y);
@@ -1621,6 +1715,75 @@
         function changeTDSpeed(val) { tdSpeed = parseInt(val) || 1; }
         function stopTD() { if (tdLoop) { clearInterval(tdLoop); tdLoop = null; } }
 
+        /* ---------- 選關畫面 ---------- */
+        function loadTDProgress() {
+            if (tdProgressLoaded) return;
+            tdProgressLoaded = true;
+            try { const v = parseInt(localStorage.getItem('arcade_td_cleared')); if (!isNaN(v)) tdMaxCleared = Math.max(0, Math.min(TD_LEVELS.length, v)); } catch (e) { }
+        }
+        function saveTDProgress() { try { localStorage.setItem('arcade_td_cleared', String(tdMaxCleared)); } catch (e) { } }
+
+        function openTD() { showLevelSelect(''); }
+
+        function showLevelSelect(msg) {
+            loadTDProgress();
+            stopTD();
+            tdProj = []; tdZones = []; tdMines = []; tdStrikes = []; tdLater = [];
+            document.getElementById('td-play').style.display = 'none';
+            document.getElementById('td-recipe').style.display = 'none';
+            document.getElementById('tower-upgrade-menu').style.display = 'none';
+            document.getElementById('td-levels').style.display = 'block';
+            const banner = document.getElementById('lv-banner');
+            banner.innerText = msg || '';
+            banner.style.display = msg ? 'block' : 'none';
+            const grid = document.getElementById('lv-grid');
+            grid.innerHTML = '';
+            for (const lv of TD_LEVELS) {
+                const state = lv.id <= tdMaxCleared ? 'cleared' : (lv.id === tdMaxCleared + 1 ? 'next' : 'locked');
+                const card = document.createElement('div');
+                card.className = `lv-card ${state}`;
+                const cv = document.createElement('canvas');
+                cv.width = 204; cv.height = 144;
+                const cctx = cv.getContext('2d');
+                drawMap(cctx, lv, 0.3);
+                card.appendChild(cv);
+                const info = document.createElement('div');
+                info.className = 'lv-info';
+                info.innerHTML = `<div class="lv-name" style="color:${lv.color}">第 ${lv.id} 關　${lv.name}</div>` +
+                    `<div class="lv-meta">${lv.waves} 波｜怪物血量 ×${lv.hpMul.toFixed(2)}｜起始金錢 $${lv.money}</div>` +
+                    `<div class="lv-state">${state === 'cleared' ? '✅ 已通關，可重玩' : state === 'next' ? '▶ 可挑戰' : `🔒 通關第 ${lv.id - 1} 關後解鎖`}</div>`;
+                card.appendChild(info);
+                if (state === 'locked') {
+                    const lock = document.createElement('div');
+                    lock.className = 'lv-lock'; lock.innerText = '🔒';
+                    card.appendChild(lock);
+                } else card.onclick = () => startLevel(lv.id);
+                grid.appendChild(card);
+            }
+        }
+
+        function startLevel(id) {
+            if (id > tdMaxCleared + 1 || id < 1 || id > TD_LEVELS.length) return;   // 只能進已通關的關卡，或下一關
+            document.getElementById('td-levels').style.display = 'none';
+            document.getElementById('td-play').style.display = 'flex';
+            initTD(id);
+        }
+        function restartLevel() { startLevel(tdLevel.id); }
+
+        function levelCleared() {
+            const id = tdLevel.id;
+            tdWon = false;
+            tdMaxCleared = Math.max(tdMaxCleared, id);
+            saveTDProgress();
+            showLevelSelect(id < TD_LEVELS.length ? `🎉 第 ${id} 關通關！第 ${id + 1} 關已解鎖，請選擇下一關或重玩其他關卡` : '🏆 恭喜！你已通關全部 10 個關卡');
+        }
+
+        function resetTDProgress() {
+            if (!confirm('確定要清除所有通關紀錄嗎？')) return;
+            tdMaxCleared = 0; saveTDProgress();
+            showLevelSelect('已清除通關紀錄');
+        }
+
         /* ---------- 配方表 ---------- */
         let recipeBuilt = false;
         function toggleRecipe() {
@@ -1691,14 +1854,14 @@
                 case 5: if (Math.random() < 0.3) hurt(e, dmg * 1.2, t); break;
                 case 6: hurt(e, e.maxHp * 0.025, t); break;
                 case 7: if (e.hp < e.maxHp * 0.3) hurt(e, dmg * 1.5, t); break;
-                case 8: if (Math.random() < 0.3) e.x = Math.max(0, e.x - 70); break;
+                case 8: if (Math.random() < 0.3) { e.d = Math.max(0, e.d - 70); setPos(e); } break;
                 case 9: e.vuln = 100; break;
-                case 10: e.x += (t.x > e.x ? 1 : -1) * Math.min(14, Math.abs(t.x - e.x)); break;
+                case 10: pullToward(e, t.x, t.y, 14); break;
                 case 11: poison(e, dmg); break;
                 case 12:
                     for (const o of tdEnemies) if (o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= 70) poison(o, dmg);
                     break;
-                case 13: e.x = Math.max(0, e.x - 16); break;
+                case 13: e.d = Math.max(0, e.d - 16); setPos(e); break;
                 case 14: e.confuse = 55; break;
                 case 15: e.slow = 80; break;
                 case 16: e.reson = Math.min(5, e.reson + 1); e.resonT = 100; hurt(e, dmg * 0.12 * e.reson, t); break;
@@ -1733,7 +1896,7 @@
             for (const e of tdEnemies) {
                 if (e.hp <= 0 || Math.hypot(e.x - t.x, e.y - t.y) > t.range) continue;
                 if (t.mode === 19) { if (!target || e.hp > target.hp) target = e; }
-                else if (!target || e.x > target.x) target = e;
+                else if (!target || e.d > target.d) target = e;
             }
             return target;
         }
@@ -1800,8 +1963,8 @@
                     break;
                 }
                 case 9: {
-                    const sx = Math.min(TD_W - 10, target.x + target.speed * 18);
-                    tdStrikes.push({ x: sx, y: target.y, delay: 18, max: 18, r: 55, dmg: d, t });
+                    const sp = ahead(target, target.speed * 18);
+                    tdStrikes.push({ x: sp.x, y: sp.y, delay: 18, max: 18, r: 55, dmg: d, t });
                     break;
                 }
                 case 10:
@@ -1851,10 +2014,10 @@
                     break;
                 case 20: {
                     if (tdMines.filter(m => m.t === t).length >= 5) return false;
-                    let mx = target.x + 22;
-                    if (Math.hypot(mx - t.x, target.y - t.y) > t.range) mx = target.x;
-                    tdMines.push({ x: mx, y: target.y, t, dmg: d, life: 700, born: tdFrame });
-                    addVfxT(t, { k: 'ringfx', x: mx, y: target.y, r: 18, life: 8 });
+                    let mp = ahead(target, 22);
+                    if (Math.hypot(mp.x - t.x, mp.y - t.y) > t.range) mp = { x: target.x, y: target.y };
+                    tdMines.push({ x: mp.x, y: mp.y, t, dmg: d, life: 700, born: tdFrame });
+                    addVfxT(t, { k: 'ringfx', x: mp.x, y: mp.y, r: 18, life: 8 });
                     break;
                 }
             }
@@ -1962,7 +2125,7 @@
                     z.tick++;
                     for (const e of tdEnemies) {
                         if (e.hp <= 0 || Math.hypot(e.x - z.x, e.y - z.y) > z.r) continue;
-                        if (z.kind === 'vortex') e.x += Math.sign(z.x - e.x) * Math.min(1.8, Math.abs(z.x - e.x));
+                        if (z.kind === 'vortex') pullToward(e, z.x, z.y, 1.8);
                         if (!z.hit.has(e)) { z.hit.add(e); strike(z.t, e, z.dmg); }
                         else if (z.tick % (z.kind === 'rain' ? 12 : 15) === 0) { e.lastDmg = z.dmg; hurt(e, z.dmg, z.t); }
                     }
@@ -2019,16 +2182,21 @@
         }
 
         function spawnEnemy() {
-            const i = waveEnemiesSpawned;
-            let hp = 70 + (tdWave - 1) * 20, sp = 2.1 + (tdWave - 1) * 0.12, kind = 'normal', rad = 12;
+            const lv = tdLevel, i = waveEnemiesSpawned;
+            let hp = (70 + (tdWave - 1) * 20) * lv.hpMul;
+            let sp = Math.min(3.8, 2.1 + (tdWave - 1) * 0.1 + (lv.id - 1) * 0.05), kind = 'normal', rad = 12;
             if (tdWave >= 2 && i % 4 === 3) { kind = 'fast'; hp *= 0.6; sp *= 1.5; rad = 9; }
             else if (tdWave >= 2 && i % 5 === 4) { kind = 'tank'; hp *= 2.2; sp *= 0.7; rad = 15; }
-            if (tdWave % 5 === 0 && i === waveEnemiesTotal - 1) { kind = 'boss'; hp *= 8; sp *= 0.6; rad = 20; }
-            tdEnemies.push({
-                x: 0, y: TD_LANE + (Math.random() - 0.5) * 30, hp, maxHp: hp, speed: sp, kind, rad,
+            if ((tdWave % 5 === 0 || tdWave === lv.waves) && i === waveEnemiesTotal - 1) {
+                kind = 'boss'; hp *= tdWave === lv.waves ? 12 : 8; sp *= 0.6; rad = 20;
+            }
+            const e = {
+                d: 0, off: (Math.random() - 0.5) * 20, x: 0, y: 0, hp, maxHp: hp, speed: sp, kind, rad,
                 slow: 0, freeze: 0, stun: 0, freezeImm: 0, stunImm: 0, burn: 0, burnD: 0, poison: 0, poisonD: 0, pst: 0,
                 vuln: 0, confuse: 0, reson: 0, resonT: 0, orbT: {}, last: null, lastDmg: 0
-            });
+            };
+            setPos(e);
+            tdEnemies.push(e);
             waveEnemiesSpawned++;
         }
 
@@ -2050,8 +2218,9 @@
                 if (e.poison > 0) { e.poison--; hurt(e, e.poisonD * e.pst, e.last); if (e.poison === 0) { e.pst = 0; e.poisonD = 0; } }
                 if (e.vuln > 0) e.vuln--;
                 if (e.resonT > 0 && --e.resonT === 0) e.reson = 0;
-                e.x += sp;
-                if (e.x < 0) e.x = 0;
+                e.d += sp;
+                if (e.d < 0) e.d = 0;
+                setPos(e);
             }
         }
 
@@ -2064,8 +2233,7 @@
                     const e = tdEnemies[i];
                     if (e.hp > 0) continue;
                     tdEnemies.splice(i, 1);
-                    tdMoney += (18 + tdWave * 3) * (e.kind === 'boss' ? 6 : e.kind === 'tank' ? 1.5 : 1);
-                    tdMoney = Math.floor(tdMoney);
+                    tdMoney += Math.floor((18 + tdWave * 3) * tdLevel.rew * (e.kind === 'boss' ? 6 : e.kind === 'tank' ? 1.5 : 1));
                     const t = e.last;
                     if (t && tdTowers.includes(t)) {
                         if (t.eff === 19) t.bonus = Math.min(0.5, t.bonus + 0.01);
@@ -2087,12 +2255,13 @@
             if (waveEnemiesSpawned < waveEnemiesTotal) {
                 if (spawnTimer >= 30) { spawnTimer = 0; spawnEnemy(); }
             } else if (tdEnemies.length === 0) {
+                if (tdWave >= tdLevel.waves) { tdWon = true; return; }      // 最後一波清完就過關
                 waveClearCooldown++;
                 if (waveClearCooldown > 40) {
                     tdWave++;
-                    waveEnemiesTotal += 3;
+                    waveEnemiesTotal += 2;
                     waveEnemiesSpawned = 0; waveClearCooldown = 0; spawnTimer = 0;
-                    tdMoney += 120 + tdWave * 25;
+                    tdMoney += Math.floor((120 + tdWave * 25) * tdLevel.rew);
                     updateTDHud();
                 }
             }
@@ -2103,7 +2272,7 @@
             reap();
 
             for (let i = tdEnemies.length - 1; i >= 0; i--) {
-                if (tdEnemies[i].x >= TD_W) {
+                if (tdEnemies[i].d >= tdPathData.total) {
                     tdEnemies.splice(i, 1);
                     tdHP--;
                     if (tdHP <= 0) { tdHP = 0; tdGameOver = true; }
@@ -2117,7 +2286,8 @@
         }
 
         function tdTick() {
-            if (!tdIsPaused && !tdGameOver) for (let i = 0; i < tdSpeed; i++) { stepTD(); if (tdGameOver) break; }
+            if (!tdIsPaused && !tdGameOver) for (let i = 0; i < tdSpeed; i++) { stepTD(); if (tdGameOver || tdWon) break; }
+            if (tdWon) { levelCleared(); return; }
             if (tdMessageLife > 0) tdMessageLife--;
             drawTD();
         }
@@ -2354,17 +2524,35 @@
             ctx.restore();
         }
 
+        // 畫出關卡地圖；scale 小於 1 時用在選關縮圖
+        function drawMap(ctx, lv, scale) {
+            const c = lv.color, pts = lv.pts;
+            ctx.save();
+            ctx.scale(scale, scale);
+            ctx.fillStyle = hexA(c, 0.05); ctx.fillRect(0, 0, TD_W, TD_H);
+            ctx.strokeStyle = hexA(c, 0.07); ctx.lineWidth = 1;
+            for (let x = 0; x < TD_W; x += 40) line(ctx, x, 0, x, TD_H);
+            for (let y = 0; y < TD_H; y += 40) line(ctx, 0, y, TD_W, y);
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            const trace = () => { ctx.beginPath(); pts.forEach((p, i) => ctx[i ? 'lineTo' : 'moveTo'](p[0], p[1])); ctx.stroke(); };
+            ctx.strokeStyle = hexA(c, 0.55); ctx.lineWidth = 62; trace();
+            ctx.strokeStyle = '#0b1322'; ctx.lineWidth = 56; trace();
+            ctx.strokeStyle = hexA(c, 0.5); ctx.lineWidth = 2; ctx.setLineDash([12, 12]); ctx.lineDashOffset = -(tdFrame || 0) * (scale === 1 ? 0.8 : 0);
+            trace(); ctx.setLineDash([]);
+            const s = pts[0], e = pts[pts.length - 1];
+            ctx.fillStyle = '#ffffff'; ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('🚪', Math.max(14, s[0] + 14), s[1]);
+            ctx.fillText('🏠', Math.min(TD_W - 16, e[0]), e[1]);
+            ctx.restore();
+        }
+
         function drawTD() {
             const ctx = tdCtx;
             if (!ctx) return;
             ctx.clearRect(0, 0, TD_W, TD_H);
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
-            for (let x = 0; x < TD_W; x += 40) line(ctx, x, 0, x, TD_H);
-            for (let y = 0; y < TD_H; y += 40) line(ctx, 0, y, TD_W, y);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)'; ctx.lineWidth = 60; line(ctx, 0, TD_LANE, TD_W, TD_LANE);
-            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; line(ctx, 0, TD_LANE, TD_W, TD_LANE);
+            drawMap(ctx, tdLevel, 1);
 
             // 地雷
             for (const m of tdMines) {
@@ -2397,7 +2585,7 @@
 
             // 建塔預覽
             if (isHoveringCanvas && !tdGameOver && !fusionSourceTower && !hoverT) {
-                const onTrack = mouseY > 200 && mouseY < 280;
+                const onTrack = distToPath(mouseX, mouseY) < TD_ROAD;
                 const tooClose = tdTowers.some(t => Math.hypot(t.x - mouseX, t.y - mouseY) < 50);
                 const ok = !onTrack && !tooClose && tdMoney >= selectedTowerType.cost;
                 ctx.strokeStyle = ok ? 'rgba(56, 189, 248, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 1;
@@ -2450,7 +2638,9 @@
                 ctx.fillStyle = '#ef4444'; ctx.font = 'bold 36px sans-serif';
                 ctx.fillText('GAME OVER 遊戲結束', 340, 220);
                 ctx.fillStyle = '#f8fafc'; ctx.font = '18px sans-serif';
-                ctx.fillText(`您撐到了第 ${tdWave} 關`, 340, 270);
+                ctx.fillText(`第 ${tdLevel.id} 關失敗，撐到第 ${tdWave} 波`, 340, 270);
+                ctx.fillStyle = '#94a3b8'; ctx.font = '14px sans-serif';
+                ctx.fillText('按上方「重來」再挑戰一次，或按「選關」換一關', 340, 310);
             }
             ctx.restore();
         }
